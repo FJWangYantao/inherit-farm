@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>毕业后我继承了一个农场</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 基础重置 */
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+[hidden]{display:none!important}
+/* layout: one narrow ledger column. Story lines on top, the count below them,
+   then what you can do, what is for sale, who buys from you, and the orchard itself at the foot of the page.
+   Everything above the buttons keeps a fixed height so a button never moves under the finger. */
+:root{
+  --ground:#EDF1E6; --paper:#F8FAF3; --ink:#1E2A21; --dim:#627165; --rule:#C8D2C3;
+  --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39; --fruit:#C03F3A; --wood:#8A693D; --coin:#9A7714;
+  --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
+  --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
+    --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
+  --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.page{max-width:34rem;margin-inline:auto;padding-inline:20px;padding-block:28px 44px;display:flex;flex-direction:column;gap:22px}
+
+.head h1{font-family:var(--display);font-weight:400;font-size:1.55rem;line-height:1.3;letter-spacing:.04em;margin:0;text-wrap:balance}
+.head p{margin:4px 0 0;font-size:.75rem;letter-spacing:.1em;color:var(--dim)}
+.label{margin:0;font-size:.72rem;font-weight:400;letter-spacing:.14em;color:var(--dim)}
+
+/* story lines: newest on top, older ones fade */
+.log{list-style:none;margin:0;padding:0;height:8.5em;overflow:hidden;font-family:var(--display);font-size:1.06rem;line-height:1.7}
+.log li:nth-child(2){opacity:.6}
+.log li:nth-child(3){opacity:.4}
+.log li:nth-child(4){opacity:.27}
+.log li:nth-child(n+5){opacity:.17}
+.log li.new{animation:line-in .5s ease-out}
+
+/* the count */
+.ledger{display:flex;flex-direction:column}
+.row{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:baseline;column-gap:12px;padding-block:7px;border-bottom:1px solid var(--rule)}
+.row.off{visibility:hidden}
+.row .name{display:flex;align-items:center;gap:8px;min-width:3.4em}
+.row .name i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.row .val{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:1.35rem;font-weight:500;line-height:1.25}
+.row .val small{font-size:.8rem;font-weight:400;color:var(--dim)}
+.row .val b{display:inline-block;font-weight:500}
+.row .val b.bump{animation:bump .12s ease-out}
+.row .rate{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--dim)}
+.row .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--c);transition:width .15s linear}
+.row[data-r="fruit"]{--c:var(--fruit)}
+.row[data-r="wood"]{--c:var(--wood)}
+.row[data-r="money"]{--c:var(--coin)}
+
+/* what you can do */
+.acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.act{appearance:none;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--ink);border-radius:5px;
+  padding:10px 14px;min-height:60px;text-align:left;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0}
+.act strong{font-size:1.02rem;font-weight:600;letter-spacing:.04em}
+.act span{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.76rem;color:var(--dim)}
+.act:active:not(:disabled){transform:translateY(1px)}
+.act:focus-visible,.dbg button:focus-visible,.tool button:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
+.act:disabled{border-color:var(--rule);color:var(--dim);cursor:default}
+.act.main{grid-column:1 / -1;background:var(--leaf);border-color:var(--leaf);color:var(--on-leaf);min-height:66px;align-items:center}
+.act.main strong{font-size:1.2rem;letter-spacing:.3em;margin-right:-.3em}
+.act.arrive,.tool.arrive,.buyers.arrive,.buyers li.arrive{animation:arrive .6s ease-out}
+
+/* what is for sale: one thing per shelf */
+.shop{display:flex;flex-direction:column;gap:10px}
+.tool{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px;padding:12px 14px;background:var(--paper);border:1px dashed var(--dim);border-radius:5px}
+.tool .label{grid-column:1 / -1}
+.tool .what strong{font-family:var(--display);font-weight:400;font-size:1.2rem;letter-spacing:.06em}
+.tool .what p{margin:0;font-size:.86rem;color:var(--dim)}
+.tool button{appearance:none;font:inherit;font-family:var(--num);font-size:.84rem;font-variant-numeric:tabular-nums;color:var(--ink);background:transparent;border:1px solid var(--ink);border-radius:5px;padding:8px 12px;cursor:pointer;touch-action:manipulation;white-space:nowrap}
+.tool button:disabled{border-color:var(--rule);color:var(--dim);cursor:default}
+
+/* who buys from you */
+.buyers{display:flex;flex-direction:column;gap:4px}
+.buyers .label{display:flex;justify-content:space-between;gap:12px}
+.buyers .label b{font-weight:400;color:var(--ink);letter-spacing:.06em}
+.buyers ul{list-style:none;margin:0;padding:0}
+.buyers li{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;align-items:start;padding-block:9px;border-bottom:1px solid var(--rule)}
+.buyers .who strong{font-weight:600;display:flex;align-items:center;gap:8px}
+.buyers .who strong::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid var(--dim);flex:none}
+.buyers li.next .who strong::before{background:var(--leaf);border-color:var(--leaf)}
+.buyers .who p{margin:0;padding-left:15px;font-family:var(--display);font-size:.95rem;color:var(--dim)}
+.buyers .deal{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+.buyers .deal .left{color:var(--dim)}
+.buyers .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--coin)}
+
+/* the orchard */
+.plot{border-top:1px solid var(--rule);padding-top:16px;display:flex;flex-direction:column;gap:12px}
+.trees{display:flex;flex-wrap:wrap;gap:8px 6px;align-items:flex-end}
+.t,.p{position:relative;flex:none;width:14px;height:21px}
+.t::before{content:"";position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;
+  background:radial-gradient(circle at 34% 42%,var(--fruit) 0 1.6px,transparent 2.1px),radial-gradient(circle at 70% 66%,var(--fruit) 0 1.6px,transparent 2.1px),var(--leaf)}
+.p::before{content:"";position:absolute;left:1px;top:0;width:12px;height:16px;background:var(--pine);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.t::after,.p::after{content:"";position:absolute;left:6px;bottom:0;width:2px;height:7px;background:var(--wood)}
+.t.new,.p.new{animation:grow .45s ease-out;transform-origin:50% 100%}
+.plot p{margin:0;font-size:.82rem;color:var(--dim)}
+
+/* tuning controls, not part of the game */
+.dbg{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:10px;padding-top:12px;border-top:1px dotted var(--rule);font-size:.76rem;color:var(--dim)}
+.dbg .seg{display:flex;gap:4px}
+.dbg button{appearance:none;font:inherit;font-family:var(--num);color:var(--dim);background:transparent;border:1px solid var(--rule);border-radius:4px;padding:3px 9px;cursor:pointer}
+.dbg button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
+.dbg .time{font-family:var(--num);font-variant-numeric:tabular-nums}
+.dbg .push{margin-left:auto}
+
+@keyframes line-in{from{opacity:0;transform:translateY(-4px)}}
+@keyframes arrive{from{opacity:0;transform:translateY(5px)}}
+@keyframes grow{from{transform:scale(.2);opacity:0}}
+@keyframes bump{50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion: reduce){
+  .log li.new,.act.arrive,.tool.arrive,.buyers.arrive,.buyers li.arrive,.t.new,.p.new,.row .val b.bump{animation:none}
+  .row .meter{transition:none}
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="head">
+    <h1>毕业后我继承了一个农场</h1>
+    <p>原型 · 阶段 1 到 5</p>
+  </header>
+
+  <ol class="log" id="log" aria-live="polite"></ol>
+
+  <section class="ledger" aria-label="库存">
+    <div class="row" data-r="fruit" id="row-fruit">
+      <span class="name"><i></i>果子</span>
+      <span class="val"><b id="v-fruit">0</b><small id="c-fruit"></small></span>
+      <span class="rate" id="r-fruit"></span>
+      <span class="meter" id="m-fruit"></span>
+    </div>
+    <div class="row off" data-r="wood" id="row-wood">
+      <span class="name"><i></i>木头</span>
+      <span class="val"><b id="v-wood">0</b><small id="c-wood"></small></span>
+      <span class="rate" id="r-wood"></span>
+      <span class="meter" id="m-wood"></span>
+    </div>
+    <div class="row off" data-r="money" id="row-money">
+      <span class="name"><i></i>钱</span>
+      <span class="val"><b id="v-money">0</b></span>
+      <span class="rate" id="r-money"></span>
+    </div>
+  </section>
+
+  <section class="acts" aria-label="能做的事">
+    <button class="act main" id="b-pick" type="button"><strong>摘果</strong></button>
+    <button class="act" id="b-plant" type="button" hidden><strong>种树</strong><span id="s-plant"></span></button>
+    <button class="act" id="b-chop" type="button" hidden><strong>砍柴</strong><span>+1 木头</span></button>
+    <button class="act" id="b-timber" type="button" hidden><strong>种林木</strong><span id="s-timber"></span></button>
+    <button class="act" id="b-expand" type="button" hidden><strong>扩建仓库</strong><span id="s-expand"></span></button>
+    <button class="act" id="b-sell" type="button" hidden><strong>卖果</strong><span id="s-sell"></span></button>
+  </section>
+
+  <div class="shop" id="shop" hidden>
+    <section class="tool" id="card-tech" hidden>
+      <h2 class="label" id="l-tech"></h2>
+      <div class="what"><strong id="n-tech"></strong><p id="d-tech"></p></div>
+      <button id="b-tech" type="button"></button>
+    </section>
+    <section class="tool" id="card-lux" hidden>
+      <h2 class="label" id="l-lux"></h2>
+      <div class="what"><strong id="n-lux"></strong><p id="d-lux"></p></div>
+      <button id="b-lux" type="button"></button>
+    </section>
+    <section class="tool" id="card-prod" hidden>
+      <h2 class="label" id="l-prod"></h2>
+      <div class="what"><strong id="n-prod"></strong><p id="d-prod"></p></div>
+      <button id="b-prod" type="button"></button>
+    </section>
+  </div>
+
+  <section class="buyers" id="buyers" hidden>
+    <h2 class="label"><span>买家</span><b id="face"></b></h2>
+    <ul id="buyer-list"></ul>
+  </section>
+
+  <section class="plot" id="plot" hidden>
+    <div class="trees" id="trees"></div>
+    <p id="plot-cap"></p>
+  </section>
+
+  <footer class="dbg">
+    <span>调试</span>
+    <span class="time" id="d-time">已玩 0:00</span>
+    <span class="seg" role="group" aria-label="速度">
+      <button type="button" data-speed="1" aria-pressed="true">×1</button>
+      <button type="button" data-speed="10" aria-pressed="false">×10</button>
+      <button type="button" data-speed="60" aria-pressed="false">×60</button>
+    </span>
+    <button type="button" id="b-reset" class="push">重新开始</button>
+  </footer>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- numbers ----
+  var KEY = 'inherit-farm-proto-v1';
+  var WOOD_FOR_EXPAND = [20, 200, 1000];
+
+  // stage 4: one at a time from the hardware shop
+  var TOOLS = [
+    { name: '梯子', money: 50,  wood: 0,   desc: '果树产量 +50%',
+      line: '有了梯子，高处的果子也够得着了。' },
+    { name: '锯子', money: 100, wood: 0,   desc: '林木产量翻倍',
+      line: '锯子比斧头快得多。' },
+    { name: '果摊', money: 200, wood: 300, desc: '仓库满了以后，多出来的果子自动卖掉',
+      line: '在路边支了个果摊。仓库放不下的果子摆在那儿，自己就卖掉了。' },
+    { name: '高梯', money: 500, wood: 0,   desc: '果树产量再 +50%',
+      line: '卖果一趟一趟地背，太慢了。五金店里有手推车。' }
+  ];
+  // stage 5: three shelves, each price several times the one before
+  var TECH = [
+    { name: '手推车',   money: 500,  lot: 1000,  desc: '卖果一趟最多卖 1,000 个',
+      line: '有了手推车，一趟能拉一千个。手头宽裕了，也该置办点像样的东西。' },
+    { name: '电动三轮', money: 8000, lot: 10000, desc: '卖果一趟最多卖 10,000 个',
+      line: '电动三轮一趟能拉一万个。' }
+  ];
+  var LUX = [
+    { name: '一身新衣服', money: 1200,   own: '穿着一身新衣服', desc: '面子 +1。穿得体面些，镇上的人才愿意跟你谈',
+      line: '换了一身新衣服。镇上的小贩主动过来打招呼。' },
+    { name: '一辆汽车',   money: 12000,  own: '门口停着一辆车', desc: '面子 +1。开车去谈，大买家才肯见你',
+      line: '开着车去谈，批发商把你请进了屋。' },
+    { name: '镇上一套房', money: 100000, own: '镇上有一套房',   desc: '面子 +1。在镇上有了住处，就是自己人',
+      line: '在镇上买了房。饭店老板说，都是邻居了。' }
+  ];
+  var PROD = [
+    { name: '修枝剪', money: 3000,  desc: '果树产量 +50%', line: '修过枝的树，果子结得更密。' },
+    { name: '喷灌',   money: 15000, desc: '果树产量 +50%', line: '装了喷灌，不用再挑水了。' },
+    { name: '拖拉机', money: 60000, desc: '果树产量 +50%', line: '拖拉机开进了果园。' }
+  ];
+  // price is money per 100 fruit; cap is how much they will take, refill is how fast that comes back (fruit per second)
+  var BUYERS = [
+    { name: '村口王婶', face: 0, price: 10, cap: 0,      refill: 0,    remark: '来多少收多少。' },
+    { name: '镇上小贩', face: 1, price: 20, cap: 3000,   refill: 40,   remark: '穿得挺精神。你的果子我要了。' },
+    { name: '批发商',   face: 2, price: 40, cap: 30000,  refill: 200,  remark: '开车来的？进来坐，量大好说。' },
+    { name: '饭店老板', face: 3, price: 80, cap: 300000, refill: 1000, remark: '都是邻居了，店里的果子以后都找你。' }
+  ];
+
+  function cap(level) { return 100 * Math.pow(5, level); }
+  function expandCost(level) {
+    var w = WOOD_FOR_EXPAND[level];
+    return { fruit: cap(level), wood: w !== undefined ? w : Math.round(cap(level) * 0.4) };
+  }
+  function treeCost(n) { return Math.ceil(10 * Math.pow(1.15, n)); }
+  function timberCost(n) { return Math.ceil(50 * Math.pow(1.15, n)); }
+
+  function fresh() {
+    return {
+      fruit: 0, wood: 0, money: 0, trees: 0, timber: 0, level: 0,
+      tools: 0, tech: 0, lux: 0, prod: 0, dem: [0, 0, 0, 0],
+      f: { tree: false, cap: false, sell: false, sold: false, done: false, end: false },
+      log: ['你毕业了。爷爷留给你一块地。'],
+      played: 0, last: Date.now()
+    };
+  }
+
+  var S = null, speed = 1, newLine = false, stallRate = 0;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- rules ----
+  function fruitRate() {
+    return S.trees * (S.tools >= 1 ? 1.5 : 1) * (S.tools >= 4 ? 1.5 : 1) * Math.pow(1.5, S.prod);
+  }
+  function woodRate() { return S.timber * 0.5 * (S.tools >= 2 ? 2 : 1); }
+  function hasStall() { return S.tools >= 3; }
+  function lot() { return S.tech >= 1 ? TECH[S.tech - 1].lot : 100; }
+  function knows(i) { return S.lux >= BUYERS[i].face; }
+  // the best-paying buyer who will still take a full hundred
+  function nextBuyer() {
+    var best = 0;
+    for (var i = 1; i < BUYERS.length; i++) if (knows(i) && S.dem[i] >= 100) best = i;
+    return best;
+  }
+  // fruit that will not fit goes to whoever pays best and still wants some
+  function sellOverflow(x) {
+    var got = 0;
+    for (var i = BUYERS.length - 1; i >= 1 && x > 0; i--) {
+      if (!knows(i) || S.dem[i] <= 0) continue;
+      var q = Math.min(x, S.dem[i]);
+      S.dem[i] -= q; x -= q; got += q * BUYERS[i].price / 100;
+    }
+    got += x * BUYERS[0].price / 100;
+    S.money += got;
+    return got;
+  }
+  function addFruit(x) {
+    var c = cap(S.level), got = 0;
+    S.fruit += x;
+    if (S.fruit > c) {
+      if (hasStall()) got = sellOverflow(S.fruit - c);
+      S.fruit = c;
+    }
+    return got;
+  }
+  function addWood(x) { S.wood = Math.min(cap(S.level), S.wood + x); }
+
+  function say(text) {
+    S.log.unshift(text);
+    if (S.log.length > 8) S.log.length = 8;
+    newLine = true;
+  }
+
+  function check() {
+    if (!S.f.tree && S.fruit >= 10) { S.f.tree = true; say('地上落了不少果核。也许可以种。'); }
+    if (!S.f.cap && S.level === 0 && S.fruit >= cap(0)) { S.f.cap = true; say('仓库满了，果子放不下了。得弄些木头来扩建。'); }
+    if (!S.f.sell && S.trees >= 30) { S.f.sell = true; say('果香飘到了村口，有人来问你卖不卖。'); }
+    if (!S.f.end && S.tech === TECH.length && S.lux === LUX.length && S.prod === PROD.length) {
+      S.f.end = true; say('（原型的内容到这里。）');
+    }
+  }
+
+  function step(dt) {
+    for (var i = 1; i < BUYERS.length; i++) {
+      if (knows(i)) S.dem[i] = Math.min(BUYERS[i].cap, S.dem[i] + BUYERS[i].refill * dt);
+    }
+    var got = addFruit(fruitRate() * dt);
+    addWood(woodRate() * dt);
+    check();
+    return got;
+  }
+  // long stretches are walked a second at a time so buyers refill as they would have
+  function tick(dt) {
+    var got = 0;
+    while (dt > 1) { got += step(1); dt -= 1; }
+    if (dt > 0) got += step(dt);
+    return got;
+  }
+
+  function buyFrom(list, key) {
+    var t = list[S[key]];
+    if (!t || S.money < t.money || S.wood < (t.wood || 0)) return false;
+    S.money -= t.money; S.wood -= (t.wood || 0); S[key] += 1;
+    say(t.line);
+    return true;
+  }
+
+  var act = {
+    pick: function () { addFruit(1); bump(); },
+    plant: function () {
+      var c = treeCost(S.trees);
+      if (S.fruit < c) return;
+      S.fruit -= c; S.trees += 1;
+      if (S.trees === 1) say('种下了第一棵树。它自己会结果。');
+    },
+    chop: function () { addWood(1); },
+    timber: function () {
+      var c = timberCost(S.timber);
+      if (S.level < 1 || S.fruit < c) return;
+      S.fruit -= c; S.timber += 1;
+      if (S.timber === 1) say('坡上种了第一棵林木。木头不用自己砍了。');
+    },
+    expand: function () {
+      var c = expandCost(S.level);
+      if (S.fruit < c.fruit || S.wood < c.wood) return;
+      S.fruit -= c.fruit; S.wood -= c.wood; S.level += 1;
+      say(S.level === 1 ? '仓库宽敞了，能放 ' + fmt(cap(1)) + ' 个。坡上还能种些林木。'
+                        : '仓库又扩了一圈，能放 ' + fmt(cap(S.level)) + ' 个。');
+    },
+    sell: function () {
+      var i = nextBuyer(), b = BUYERS[i];
+      var q = Math.min(lot(), Math.floor((S.fruit + 1e-9) / 100) * 100);
+      if (b.cap) q = Math.min(q, Math.floor(S.dem[i] / 100) * 100);
+      if (q < 100) return;
+      S.fruit -= q; S.money += q * b.price / 100;
+      if (b.cap) S.dem[i] -= q;
+      if (!S.f.sold) { S.f.sold = true; say('换到了第一笔钱。镇上的五金店有工具卖。'); }
+    },
+    tool: function () { buyFrom(TOOLS, 'tools'); },
+    tech: function () { if (S.tools >= TOOLS.length) buyFrom(TECH, 'tech'); },
+    lux: function () {
+      if (S.tech < 1) return;
+      if (buyFrom(LUX, 'lux')) {
+        for (var i = 1; i < BUYERS.length; i++) if (BUYERS[i].face === S.lux) S.dem[i] = BUYERS[i].cap;
+      }
+    },
+    prod: function () { if (S.lux >= 1) buyFrom(PROD, 'prod'); }
+  };
+
+  // ---- display ----
+  function fmt(n) { return Math.floor(n + 1e-9).toLocaleString('en-US'); }
+  function fmtRate(r) { return '+' + (Math.abs(r - Math.round(r)) < 1e-9 ? fmt(Math.round(r)) : r.toFixed(1)) + '/秒'; }
+  function clock(s) {
+    s = Math.floor(s);
+    var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+  function bump() {
+    var el = $('v-fruit'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+  function show(el, on) {
+    if (on && el.hidden) { el.hidden = false; el.classList.add('arrive'); }
+    else if (!on && !el.hidden) { el.hidden = true; }
+  }
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+
+  // one shelf card: shows the next thing on that shelf, or hides when there is none
+  function shelf(key, label, item, visible) {
+    var cardEl = $('card-' + key);
+    if (!visible || !item) { show(cardEl, false); return false; }
+    var changed = !cardEl.hidden && $('n-' + key).textContent !== item.name;
+    show(cardEl, true);
+    if (changed) { cardEl.classList.remove('arrive'); void cardEl.offsetWidth; cardEl.classList.add('arrive'); }
+    setText($('l-' + key), label);
+    setText($('n-' + key), item.name);
+    setText($('d-' + key), item.desc);
+    setText($('b-' + key), fmt(item.money) + ' 钱' + (item.wood ? ' + ' + fmt(item.wood) + ' 木头' : ''));
+    $('b-' + key).disabled = S.money < item.money || S.wood < (item.wood || 0);
+    return true;
+  }
+
+  function renderBuyers() {
+    var box = $('buyers'), list = $('buyer-list');
+    show(box, S.lux >= 1);
+    if (S.lux < 1) { if (list.children.length) list.textContent = ''; return; }
+    var known = [];
+    for (var i = BUYERS.length - 1; i >= 0; i--) if (knows(i)) known.push(i);
+    if (list.children.length !== known.length) {
+      var had = list.children.length;
+      list.textContent = '';
+      known.forEach(function (i, n) {
+        var b = BUYERS[i], li = document.createElement('li');
+        li.dataset.i = i;
+        if (had && n === 0) li.className = 'arrive';
+        li.innerHTML = '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="left"></span></div><span class="meter"></span>';
+        li.querySelector('strong').textContent = b.name;
+        li.querySelector('p').textContent = b.remark;
+        li.querySelector('.price').textContent = '每 100 个 ' + b.price + ' 钱';
+        list.appendChild(li);
+      });
+    }
+    var next = nextBuyer();
+    Array.prototype.forEach.call(list.children, function (li) {
+      var i = Number(li.dataset.i), b = BUYERS[i];
+      li.classList.toggle('next', i === next);
+      setText(li.querySelector('.left'), b.cap ? '还收 ' + fmt(S.dem[i]) : '不限量');
+      li.querySelector('.meter').style.width = b.cap ? Math.min(100, S.dem[i] / b.cap * 100) + '%' : '0';
+    });
+    setText($('face'), '面子 ' + S.lux);
+  }
+
+  function render() {
+    var c = cap(S.level);
+
+    // story
+    if (newLine || $('log').children.length !== S.log.length) {
+      var ol = $('log'); ol.textContent = '';
+      S.log.forEach(function (line, i) {
+        var li = document.createElement('li'); li.textContent = line;
+        if (i === 0 && newLine) li.className = 'new';
+        ol.appendChild(li);
+      });
+      newLine = false;
+    }
+
+    // count
+    setText($('v-fruit'), fmt(S.fruit));
+    setText($('c-fruit'), S.f.cap ? ' / ' + fmt(c) : '');
+    setText($('r-fruit'), S.trees > 0 ? fmtRate(fruitRate()) : '');
+    $('m-fruit').style.width = S.f.cap ? Math.min(100, S.fruit / c * 100) + '%' : '0';
+
+    $('row-wood').classList.toggle('off', !S.f.cap);
+    setText($('v-wood'), fmt(S.wood));
+    setText($('c-wood'), ' / ' + fmt(c));
+    setText($('r-wood'), S.timber > 0 ? fmtRate(woodRate()) : '');
+    $('m-wood').style.width = Math.min(100, S.wood / c * 100) + '%';
+
+    $('row-money').classList.toggle('off', !S.f.sold);
+    setText($('v-money'), fmt(S.money));
+    setText($('r-money'), hasStall() ? (S.fruit >= c ? '果摊在卖 ' + fmtRate(stallRate) : '果摊等仓库满') : '');
+
+    // actions
+    show($('b-plant'), S.f.tree);
+    setText($('s-plant'), fmt(treeCost(S.trees)) + ' 果子');
+    $('b-plant').disabled = S.fruit < treeCost(S.trees);
+
+    show($('b-chop'), S.f.cap);
+
+    show($('b-timber'), S.level >= 1);
+    setText($('s-timber'), fmt(timberCost(S.timber)) + ' 果子');
+    $('b-timber').disabled = S.fruit < timberCost(S.timber);
+
+    var e = expandCost(S.level);
+    show($('b-expand'), S.f.cap);
+    setText($('s-expand'), fmt(e.fruit) + ' 果子 + ' + fmt(e.wood) + ' 木头');
+    $('b-expand').disabled = S.fruit < e.fruit || S.wood < e.wood;
+
+    show($('b-sell'), S.f.sell);
+    var nb = BUYERS[nextBuyer()];
+    setText($('s-sell'), S.lux >= 1 ? nb.name + ' · 100 个换 ' + nb.price + ' 钱' : '100 果子 换 10 钱');
+    $('b-sell').disabled = S.fruit < 100;
+
+    // shelves
+    var any = false;
+    if (S.tools < TOOLS.length) any = shelf('tech', '镇上五金店', TOOLS[S.tools], S.f.sold) || any;
+    else any = shelf('tech', '科技工具', TECH[S.tech], true) || any;
+    any = shelf('lux', '奢侈品', LUX[S.lux], S.tech >= 1) || any;
+    any = shelf('prod', '生产工具', PROD[S.prod], S.lux >= 1) || any;
+    $('shop').hidden = !any;
+
+    renderBuyers();
+
+    // orchard
+    var plot = $('plot'), trees = $('trees');
+    plot.hidden = S.trees + S.timber === 0;
+    var haveT = trees.querySelectorAll('.t').length, haveP = trees.querySelectorAll('.p').length;
+    if (haveT > S.trees || haveP > S.timber) { trees.textContent = ''; haveT = 0; haveP = 0; }
+    var burst = (S.trees - haveT) + (S.timber - haveP) <= 3;
+    var firstPine = trees.querySelector('.p');
+    for (; haveT < S.trees; haveT++) {
+      var a = document.createElement('i'); a.className = burst ? 't new' : 't';
+      trees.insertBefore(a, firstPine);
+    }
+    for (; haveP < S.timber; haveP++) {
+      var b = document.createElement('i'); b.className = burst ? 'p new' : 'p';
+      trees.appendChild(b);
+    }
+    setText($('plot-cap'), '果树 ' + S.trees + ' 棵' + (S.timber ? ' · 林木 ' + S.timber + ' 棵' : '') +
+      (hasStall() ? ' · 路边一个果摊' : '') + (S.lux >= 1 ? ' · ' + LUX[S.lux - 1].own : ''));
+
+    setText($('d-time'), '已玩 ' + clock(S.played));
+  }
+
+  // ---- saving ----
+  function save() {
+    S.last = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (err) {}
+  }
+  // a game saved by an earlier version of this page picks up where it was
+  function normalize(d) {
+    var base = fresh();
+    if (!d || typeof d !== 'object') return null;
+    Object.keys(base).forEach(function (k) { if (d[k] === undefined) d[k] = base[k]; });
+    if (!d.f || typeof d.f !== 'object') d.f = base.f;
+    Object.keys(base.f).forEach(function (k) { if (d.f[k] === undefined) d.f[k] = false; });
+    if (!Array.isArray(d.dem)) d.dem = [0, 0, 0, 0];
+    for (var i = 0; i < BUYERS.length; i++) d.dem[i] = Number(d.dem[i]) || 0;
+    if (!Array.isArray(d.log)) d.log = base.log;
+    if (!d.f.end) d.log = d.log.filter(function (line) { return String(line).indexOf('（原型的内容到这里') !== 0; });
+    return d;
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? normalize(JSON.parse(raw)) : null;
+    } catch (err) { return null; }
+  }
+  function catchUp() {
+    var away = Math.min((Date.now() - (S.last || Date.now())) / 1000, 8 * 3600);
+    if (away < 5) return;
+    var f0 = S.fruit, w0 = S.wood, m0 = S.money;
+    tick(away);
+    if (away >= 60) {
+      var parts = [];
+      if (S.fruit - f0 >= 1) parts.push('果子 +' + fmt(S.fruit - f0));
+      if (S.wood - w0 >= 1) parts.push('木头 +' + fmt(S.wood - w0));
+      if (S.money - m0 >= 1) parts.push('钱 +' + fmt(S.money - m0));
+      var mins = Math.round(away / 60);
+      say('你离开了 ' + (mins >= 60 ? Math.floor(mins / 60) + ' 小时 ' + (mins % 60) + ' 分钟' : mins + ' 分钟') + '。' + (parts.length ? parts.join('，') + '。' : '仓库早就满了。'));
+    }
+  }
+
+  // ---- wiring ----
+  function start(data) {
+    S = data && data.S ? normalize(data.S) : null;
+    if (!S) { S = load(); if (S) catchUp(); else S = fresh(); }
+
+    [['b-pick', 'pick'], ['b-plant', 'plant'], ['b-chop', 'chop'], ['b-timber', 'timber'],
+     ['b-expand', 'expand'], ['b-sell', 'sell'], ['b-lux', 'lux'], ['b-prod', 'prod']].forEach(function (p) {
+      $(p[0]).addEventListener('click', function () { act[p[1]](); check(); render(); });
+    });
+    $('b-tech').addEventListener('click', function () {
+      if (S.tools < TOOLS.length) act.tool(); else act.tech();
+      check(); render();
+    });
+
+    document.querySelectorAll('.dbg [data-speed]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        speed = Number(btn.dataset.speed);
+        document.querySelectorAll('.dbg [data-speed]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === btn)); });
+      });
+    });
+
+    var armed = 0, resetBtn = $('b-reset');
+    resetBtn.addEventListener('click', function () {
+      if (Date.now() < armed) {
+        S = fresh(); newLine = false; armed = 0; stallRate = 0; resetBtn.textContent = '重新开始';
+        document.querySelectorAll('.arrive').forEach(function (el) { el.classList.remove('arrive'); });
+        save(); render();
+      } else {
+        armed = Date.now() + 3000; resetBtn.textContent = '再点一次确认';
+        setTimeout(function () { if (armed && Date.now() >= armed) { armed = 0; resetBtn.textContent = '重新开始'; } }, 3100);
+      }
+    });
+
+    var prev = performance.now(), sinceSave = 0;
+    setInterval(function () {
+      var now = performance.now(), real = (now - prev) / 1000; prev = now;
+      var dt = real * speed;
+      S.played += dt;
+      var got = tick(dt);
+      if (dt > 0) stallRate = got / dt;
+      render();
+      sinceSave += real;
+      if (sinceSave >= 5) { sinceSave = 0; save(); }
+    }, 100);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) save(); });
+
+    window.farm = { get state() { return S; }, tick: tick, act: act, render: render };
+    render();
+  }
+
+  var hot = window.claude && window.claude.hot;
+  if (hot && typeof hot.snapshot === 'function') hot.snapshot(function () { return { S: S }; });
+  if (hot && typeof hot.ready === 'function') hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
+</body>
+</html>
