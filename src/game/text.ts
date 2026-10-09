@@ -12,6 +12,10 @@ export const T = {
   firstTimber: '坡上种了第一棵林木。木头不用自己砍了。',
   firstExpand: (c: number) => `仓库宽敞了，能放 ${fmt(c)} 个。坡上还能种些林木。`,
   expand: (c: number) => `仓库又扩了一圈，能放 ${fmt(c)} 个。`,
+  canJam: '柴房堆满了木头。收拾爷爷的老屋时，翻出奶奶留下的果酱方子，要用柴火慢慢熬。',
+  firstJar: '熬好了第一罐果酱。买家尝了一口，说比果子值钱多了。',
+  firstShop: '在坡下盖了间果酱作坊。仓库里的果子和柴火，作坊自己会拿去熬。',
+  jamFull: '果酱罐子堆满了，作坊停了火。听说县里有卖冷藏车的。',
   end: '（目前的内容到这里，后面的故事还在写。）',
   away: (seconds: number, gains: string[]) => {
     const mins = Math.round(seconds / 60);

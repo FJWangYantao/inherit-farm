@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUYERS, LUX, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, PROD, TECH, TOOLS, cap, expandCost, treeCost
+  BUYERS, JAM_MULT, JAM_UNLOCK_WOOD, LUX, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, PROD, TECH, TECH_COLD_TRUCK,
+  TOOLS, cap, expandCost, jamCap, treeCost, workshopCost
 } from '../src/game/config';
 import { Game } from '../src/game/game';
 import { fresh, type GameState } from '../src/game/state';
@@ -131,10 +132,29 @@ describe('商店', () => {
   });
 
   it('全部买完到结尾', () => {
-    const g = game({ money: 1e7, tools: TOOLS.length, f: { sold: true } as GameState['f'] });
+    const g = game({ money: 1e9, tools: TOOLS.length, f: { sold: true, jamFull: true } as GameState['f'] });
     while (g.buy('tech') || g.buy('lux') || g.buy('prod')) { /* 买到没得买 */ }
+    expect(g.s).toMatchObject({ tech: TECH.length, lux: LUX.length, prod: PROD.length });
     expect(g.s.f.end).toBe(true);
     expect(g.s.log[0]).toBe(T.end);
+  });
+
+  it('旧版本到过结尾的存档，有了新内容就收回结尾那句', () => {
+    const g = game({ tools: TOOLS.length, tech: 2, lux: 3, prod: 3, log: [T.end, '更早的一句'], f: { end: true } as GameState['f'] });
+    g.check();
+    expect(g.s.f.end).toBe(false);
+    expect(g.s.log).toEqual(['更早的一句']);
+  });
+
+  it('科技工具：冷藏车要等果酱放满过才上货架，它不改一趟的量', () => {
+    const g = game({ money: 1e9, tools: TOOLS.length, tech: TECH_COLD_TRUCK - 1, f: { sold: true } as GameState['f'] });
+    expect(g.shelfItem('tech')).toBeUndefined();
+    g.s.f.jamFull = true;
+    expect(g.shelfItem('tech')).toBe(TECH[TECH_COLD_TRUCK - 1]);
+    const before = g.lot();
+    g.buy('tech');
+    expect(g.lot()).toBe(before);
+    expect(g.hasColdTruck()).toBe(true);
   });
 
   it('产量加成相乘', () => {
@@ -176,5 +196,69 @@ describe('离线', () => {
     const g = game(base);
     g.catchUp(2 * 3600 + 5 * 60);
     expect(g.s.log[0]).toMatch(/^你离开了 2 小时 5 分钟。.*钱 \+/);
+  });
+});
+
+describe('果酱', () => {
+  const ready = { f: { jam: true } as GameState['f'], fruit: 1000, wood: 1000, level: 3 };
+
+  it('有了房、木头攒够了出现熬果酱', () => {
+    const g = game({ lux: 3, wood: JAM_UNLOCK_WOOD - 1, level: 4 });
+    g.check();
+    expect(g.s.f.jam).toBe(false);
+    g.s.wood = JAM_UNLOCK_WOOD;
+    g.check();
+    expect(g.s.f.jam).toBe(true);
+    expect(g.s.log[0]).toBe(T.canJam);
+  });
+
+  it('手动熬一罐花 100 果子和 10 木头，第一罐之后出现作坊', () => {
+    const g = game(ready);
+    expect(g.buildShop()).toBe(false);
+    expect(g.cook()).toBe(true);
+    expect(g.s).toMatchObject({ fruit: 900, wood: 990, jam: 1 });
+    expect(g.s.log).toContain(T.firstJar);
+    g.s.money = workshopCost(0);
+    expect(g.buildShop()).toBe(true);
+    expect(g.s.money).toBe(0);
+    expect(workshopCost(1)).toBeGreaterThan(workshopCost(0));
+  });
+
+  it('作坊从仓库拿果子和木头，每秒每间熬一罐，木头不够就停', () => {
+    const g = game({ ...ready, shops: 2, wood: 25, f: { jam: true, cooked: true } as GameState['f'] });
+    g.tick(1);
+    expect(g.s).toMatchObject({ jam: 2, fruit: 800, wood: 5 });
+    g.tick(1);
+    expect(g.s.jam).toBeCloseTo(2.5);
+    expect(g.s.wood).toBeCloseTo(0);
+  });
+
+  it('果酱有上限，放满了作坊停火并出现冷藏车', () => {
+    const c = jamCap(3);
+    const g = game({ ...ready, fruit: 10000, wood: 1e4, shops: 3, jam: c - 1, f: { jam: true, cooked: true } as GameState['f'] });
+    g.tick(1);
+    expect(g.s.jam).toBe(c);
+    expect(g.s.fruit).toBe(10000 - 100);
+    expect(g.s.f.jamFull).toBe(true);
+    expect(g.s.log[0]).toBe(T.jamFull);
+    expect(g.cook()).toBe(false);
+  });
+
+  it('有冷藏车以后，放不下的果酱按果酱价卖掉', () => {
+    const c = jamCap(3);
+    const g = game({ ...ready, fruit: 10000, wood: 1e4, shops: 3, jam: c, tech: TECH_COLD_TRUCK,
+      f: { jam: true, cooked: true, jamFull: true } as GameState['f'] });
+    const got = g.tick(1);
+    expect(g.s.jam).toBe(c);
+    expect(got).toBeCloseTo(3 * BUYERS[0].price * JAM_MULT);
+  });
+
+  it('卖果酱给出价最高的买家，一罐按 100 个果子的量算', () => {
+    const g = game({ jam: 50, lux: 3, tech: 2, dem: [0, 0, 0, 1000], f: { cooked: true } as GameState['f'] });
+    expect(g.sellJam()).toBe(10);
+    expect(g.s.money).toBe(10 * BUYERS[3].price * JAM_MULT);
+    expect(g.s.dem[3]).toBe(0);
+    expect(g.sellJam()).toBe(40);
+    expect(g.s.jam).toBe(0);
   });
 });

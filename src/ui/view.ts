@@ -1,7 +1,9 @@
 // 把游戏状态画到页面上。只读 Game，不改规则。
 // 布局约定：按钮上方的区域高度固定，新内容出现时已有的按钮不移位。
 
-import { BUYERS, LUX, TOOLS, expandCost, timberCost, treeCost } from '../game/config';
+import {
+  BUYERS, JAM_FRUIT, JAM_MULT, JAM_WOOD, LUX, TOOLS, WORKSHOP_RATE, expandCost, timberCost, treeCost, workshopCost
+} from '../game/config';
 import { fmt, fmtRate } from '../game/format';
 import type { Game, Shelf } from '../game/game';
 
@@ -64,6 +66,13 @@ export class View {
     setText($('v-money'), fmt(s.money));
     setText($('r-money'), g.hasStall() ? (s.fruit >= c ? '果摊在卖 ' + fmtRate(this.stallRate) : '果摊等仓库满') : '');
 
+    const jc = g.jamCap();
+    $('row-jam').classList.toggle('off', !s.f.jam);
+    setText($('v-jam'), fmt(s.jam));
+    setText($('c-jam'), ' / ' + fmt(jc));
+    setText($('r-jam'), s.shops > 0 ? fmtRate(g.jamRate()) : '');
+    $('m-jam').style.width = Math.min(100, s.jam / jc * 100) + '%';
+
     // 能做的事
     show(btn('b-plant'), s.f.tree);
     setText($('s-plant'), fmt(treeCost(s.trees)) + ' 果子');
@@ -84,6 +93,18 @@ export class View {
     const nb = BUYERS[g.nextBuyer()];
     setText($('s-sell'), s.lux >= 1 ? nb.name + ' · 100 个换 ' + nb.price + ' 钱' : '100 果子 换 10 钱');
     btn('b-sell').disabled = s.fruit < 100;
+
+    show(btn('b-cook'), s.f.jam);
+    setText($('s-cook'), fmt(JAM_FRUIT) + ' 果子 + ' + fmt(JAM_WOOD) + ' 木头');
+    btn('b-cook').disabled = s.fruit < JAM_FRUIT || s.wood < JAM_WOOD || s.jam + 1 > jc;
+
+    show(btn('b-selljam'), s.f.cooked);
+    setText($('s-selljam'), nb.name + ' · 1 罐换 ' + fmt(nb.price * JAM_MULT) + ' 钱');
+    btn('b-selljam').disabled = s.jam < 1;
+
+    show(btn('b-shop'), s.f.cooked);
+    setText($('s-shop'), fmt(workshopCost(s.shops)) + ' 钱 · 每秒熬 ' + WORKSHOP_RATE + ' 罐');
+    btn('b-shop').disabled = s.money < workshopCost(s.shops);
 
     // 货架：第一个货架先是五金店，卖完了换成科技工具
     let any = false;
@@ -138,7 +159,7 @@ export class View {
         const b = BUYERS[i], li = document.createElement('li');
         li.dataset.i = String(i);
         if (had && n === 0) li.className = 'arrive';
-        li.innerHTML = '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="left"></span></div><span class="meter"></span>';
+        li.innerHTML = '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="jam"></span><span class="left"></span></div><span class="meter"></span>';
         li.querySelector('strong')!.textContent = b.name;
         li.querySelector('p')!.textContent = b.remark;
         li.querySelector('.price')!.textContent = '每 100 个 ' + b.price + ' 钱';
@@ -149,6 +170,7 @@ export class View {
     for (const li of Array.from(list.children) as HTMLElement[]) {
       const i = Number(li.dataset.i), b = BUYERS[i];
       li.classList.toggle('next', i === next);
+      setText(li.querySelector('.jam')!, s.f.cooked ? '一罐果酱 ' + fmt(b.price * JAM_MULT) + ' 钱' : '');
       setText(li.querySelector('.left')!, b.cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
       (li.querySelector('.meter') as HTMLElement).style.width = b.cap ? Math.min(100, s.dem[i] / b.cap * 100) + '%' : '0';
     }
@@ -172,6 +194,7 @@ export class View {
       trees.appendChild(b);
     }
     setText($('plot-cap'), '果树 ' + s.trees + ' 棵' + (s.timber ? ' · 林木 ' + s.timber + ' 棵' : '') +
-      (g.hasStall() ? ' · 路边一个果摊' : '') + (s.lux >= 1 ? ' · ' + LUX[s.lux - 1].own : ''));
+      (g.hasStall() ? ' · 路边一个果摊' : '') + (s.shops ? ' · 果酱作坊 ' + s.shops + ' 间' : '') +
+      (s.lux >= 1 ? ' · ' + LUX[s.lux - 1].own : ''));
   }
 }

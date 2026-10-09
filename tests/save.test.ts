@@ -16,7 +16,7 @@ function memory(init: Record<string, string> = {}): Store & { data: Record<strin
 describe('存档', () => {
   it('存了再读回来一样', () => {
     const s = fresh(123);
-    s.fruit = 42; s.trees = 3; s.f.tree = true; s.dem = [0, 1, 2, 3];
+    s.fruit = 42; s.trees = 3; s.f.tree = true; s.jam = 7.5; s.dem = BUYERS.map((_, i) => i);
     expect(deserialize(serialize(s))).toEqual(s);
   });
 
@@ -30,7 +30,8 @@ describe('存档', () => {
     const s = load(store)!;
     expect(s.fruit).toBe(500);
     expect(s.level).toBe(1);
-    expect(s.f).toEqual({ tree: true, cap: true, sell: false, sold: false, end: false });
+    expect(s.f).toEqual({ ...fresh().f, tree: true, cap: true });
+    expect(s.jam).toBe(0);
     expect(s.dem).toHaveLength(BUYERS.length);
     expect(s.log).toEqual(['仓库满了']);
   });

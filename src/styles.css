@@ -11,7 +11,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
    Everything above the buttons keeps a fixed height so a button never moves under the finger. */
 :root{
   --ground:#EDF1E6; --paper:#F8FAF3; --ink:#1E2A21; --dim:#627165; --rule:#C8D2C3;
-  --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39; --fruit:#C03F3A; --wood:#8A693D; --coin:#9A7714;
+  --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39; --fruit:#C03F3A; --wood:#8A693D; --coin:#9A7714; --jam:#8C3561;
   --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
   --num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
@@ -19,13 +19,13 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
-    --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+    --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52; --jam:#D98AB0;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
-  --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+  --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52; --jam:#D98AB0;
   color-scheme:dark;
 }
 
@@ -60,6 +60,7 @@ body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size
 .row[data-r="fruit"]{--c:var(--fruit)}
 .row[data-r="wood"]{--c:var(--wood)}
 .row[data-r="money"]{--c:var(--coin)}
+.row[data-r="jam"]{--c:var(--jam)}
 
 /* what you can do */
 .acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -95,7 +96,7 @@ body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size
 .buyers li.next .who strong::before{background:var(--leaf);border-color:var(--leaf)}
 .buyers .who p{margin:0;padding-left:15px;font-family:var(--display);font-size:.95rem;color:var(--dim)}
 .buyers .deal{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
-.buyers .deal .left{color:var(--dim)}
+.buyers .deal .left,.buyers .deal .jam{color:var(--dim)}
 .buyers .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--coin)}
 
 /* the orchard */

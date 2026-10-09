@@ -1,10 +1,11 @@
 // 游戏规则。这里不碰界面，游戏页面、节奏模拟和测试用的是同一套。
 
 import {
-  BASE_LOT, BUYERS, LADDER_BONUS, LUX, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS,
-  OFFLINE_REPORT_SECONDS, PROD, PROD_BONUS, SAW_BONUS, SELL_UNLOCK_TREES, TECH, TIMBER_RATE, TOOL_LADDER,
-  TOOL_SAW, TOOL_STALL, TOOL_TALL_LADDER, TOOLS, TREE_RATE, TREE_UNLOCK_FRUIT, cap, expandCost, timberCost,
-  treeCost, type ShopItem
+  BASE_LOT, BUYERS, JAM_FRUIT, JAM_MULT, JAM_UNLOCK_LUX, JAM_UNLOCK_WOOD, JAM_WOOD, LADDER_BONUS, LUX, OFFLINE_EFFICIENCY,
+  OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, PROD, PROD_BONUS, SAW_BONUS,
+  SELL_UNLOCK_TREES, TECH, TECH_COLD_TRUCK, TIMBER_RATE, TOOL_LADDER, TOOL_SAW, TOOL_STALL, TOOL_TALL_LADDER,
+  TOOLS, TREE_RATE, TREE_UNLOCK_FRUIT, WORKSHOP_RATE, cap, expandCost, jamCap, timberCost, treeCost,
+  workshopCost, type ShopItem
 } from './config';
 import { fmt } from './format';
 import { LOG_LENGTH, fresh, type GameState } from './state';
@@ -40,8 +41,18 @@ export class Game {
   }
   cap(): number { return cap(this.s.level); }
   hasStall(): boolean { return this.s.tools >= TOOL_STALL; }
-  /** 卖果一趟最多卖多少个 */
-  lot(): number { return this.s.tech >= 1 ? TECH[this.s.tech - 1].lot : BASE_LOT; }
+  jamCap(): number { return jamCap(this.s.level); }
+  hasColdTruck(): boolean { return this.s.tech >= TECH_COLD_TRUCK; }
+  /** 卖果一趟最多卖多少个（果酱按一罐 100 个算） */
+  lot(): number {
+    for (let i = this.s.tech - 1; i >= 0; i--) {
+      const lot = TECH[i].lot;
+      if (lot) return lot;
+    }
+    return BASE_LOT;
+  }
+  /** 作坊每秒最多熬几罐 */
+  jamRate(): number { return this.s.shops * WORKSHOP_RATE; }
   knows(i: number): boolean { return this.s.lux >= BUYERS[i].face; }
   /** 出价最高、还收得下一整份（100 个）的买家 */
   nextBuyer(): number {
@@ -57,7 +68,10 @@ export class Game {
     const s = this.s;
     switch (key) {
       case 'tools': return s.f.sold ? TOOLS[s.tools] : undefined;
-      case 'tech': return s.tools >= TOOLS.length ? TECH[s.tech] : undefined;
+      case 'tech': {
+        const item = s.tools >= TOOLS.length ? TECH[s.tech] : undefined;
+        return item && (!item.need || s.f[item.need]) ? item : undefined;
+      }
       case 'lux': return s.tech >= 1 ? LUX[s.lux] : undefined;
       case 'prod': return s.lux >= 1 ? PROD[s.prod] : undefined;
     }
@@ -68,26 +82,43 @@ export class Game {
 
   // ---- 产出 ----
 
-  /** 果子放不下的部分卖给出价高、还收得下的买家，剩下的给村口。返回卖到的钱。 */
-  private sellOverflow(x: number): number {
+  /**
+   * 放不下的东西卖给出价高、还收得下的买家，剩下的给村口。返回卖到的钱。
+   * x 按果子个数算（一罐果酱算 100 个），mult 是价钱倍数（果酱是 JAM_MULT）。
+   */
+  private sellOverflow(x: number, mult = 1): number {
     const s = this.s;
     let got = 0;
     for (let i = BUYERS.length - 1; i >= 1 && x > 0; i--) {
       if (!this.knows(i) || s.dem[i] <= 0) continue;
       const q = Math.min(x, s.dem[i]);
-      s.dem[i] -= q; x -= q; got += q * BUYERS[i].price / 100;
+      s.dem[i] -= q; x -= q; got += q * BUYERS[i].price / 100 * mult;
     }
-    got += x * BUYERS[0].price / 100;
+    got += x * BUYERS[0].price / 100 * mult;
     s.money += got;
     return got;
   }
-  /** 返回果摊卖到的钱 */
-  private addFruit(x: number): number {
+  /**
+   * 加果子，dt 是这批果子是几秒里产的。作坊先从仓库里拿果子和木头熬果酱
+   * （dt 秒内最多熬 jamRate() * dt 罐），仓库还放不下的给果摊卖。返回自动卖到的钱。
+   */
+  private addFruit(x: number, dt = 0): number {
     const s = this.s, c = this.cap();
     let got = 0;
     s.fruit += x;
+    if (s.shops > 0 && dt > 0) {
+      const jars = Math.max(0, Math.min(this.jamRate() * dt, s.fruit / JAM_FRUIT, s.wood / JAM_WOOD,
+        this.hasColdTruck() ? Infinity : this.jamCap() - s.jam));
+      s.fruit -= jars * JAM_FRUIT;
+      s.wood -= jars * JAM_WOOD;
+      s.jam += jars;
+      if (s.jam > this.jamCap()) {
+        got += this.sellOverflow((s.jam - this.jamCap()) * JAM_FRUIT, JAM_MULT);
+        s.jam = this.jamCap();
+      }
+    }
     if (s.fruit > c) {
-      if (this.hasStall()) got = this.sellOverflow(s.fruit - c);
+      if (this.hasStall()) got += this.sellOverflow(s.fruit - c);
       s.fruit = c;
     }
     return got;
@@ -109,9 +140,12 @@ export class Game {
     if (!s.f.tree && s.fruit >= TREE_UNLOCK_FRUIT) { s.f.tree = true; this.say(T.canPlant); }
     if (!s.f.cap && s.level === 0 && s.fruit >= cap(0)) { s.f.cap = true; this.say(T.capFull); }
     if (!s.f.sell && s.trees >= SELL_UNLOCK_TREES) { s.f.sell = true; this.say(T.canSell); }
-    if (!s.f.end && s.tech === TECH.length && s.lux === LUX.length && s.prod === PROD.length) {
-      s.f.end = true; this.say(T.end);
-    }
+    if (!s.f.jam && s.lux >= JAM_UNLOCK_LUX && s.wood >= JAM_UNLOCK_WOOD) { s.f.jam = true; this.say(T.canJam); }
+    if (s.f.jam && !s.f.jamFull && s.jam >= this.jamCap()) { s.f.jamFull = true; this.say(T.jamFull); }
+    const done = s.tech === TECH.length && s.lux === LUX.length && s.prod === PROD.length;
+    if (done && !s.f.end) { s.f.end = true; this.say(T.end); }
+    // 旧版本到过结尾的存档，更新出了新内容就收回结尾那句
+    if (!done && s.f.end) { s.f.end = false; s.log = s.log.filter(line => line !== T.end); }
   }
 
   private step(dt: number): number {
@@ -119,8 +153,8 @@ export class Game {
     for (let i = 1; i < BUYERS.length; i++) {
       if (this.knows(i)) s.dem[i] = Math.min(BUYERS[i].cap, s.dem[i] + BUYERS[i].refill * dt);
     }
-    const got = this.addFruit(this.fruitRate() * dt);
     this.addWood(this.woodRate() * dt);
+    const got = this.addFruit(this.fruitRate() * dt, dt);
     this.check();
     return got;
   }
@@ -193,6 +227,37 @@ export class Game {
     s.fruit -= c.fruit; s.wood -= c.wood; s.level += 1;
     this.say(s.level === 1 ? T.firstExpand(this.cap()) : T.expand(this.cap()));
     return true;
+  }
+
+  /** 手动熬一罐果酱 */
+  cook(): boolean {
+    const s = this.s;
+    if (!s.f.jam || s.fruit < JAM_FRUIT || s.wood < JAM_WOOD || s.jam + 1 > this.jamCap()) return false;
+    s.fruit -= JAM_FRUIT; s.wood -= JAM_WOOD; s.jam += 1;
+    if (!s.f.cooked) { s.f.cooked = true; this.say(T.firstJar); }
+    this.check();
+    return true;
+  }
+
+  buildShop(): boolean {
+    const s = this.s, c = workshopCost(s.shops);
+    if (!s.f.cooked || s.money < c) return false;
+    s.money -= c; s.shops += 1;
+    if (s.shops === 1) this.say(T.firstShop);
+    return true;
+  }
+
+  /** 卖一趟果酱给 nextBuyer()，返回卖掉的罐数 */
+  sellJam(): number {
+    const s = this.s;
+    if (!s.f.cooked) return 0;
+    const i = this.nextBuyer(), b = BUYERS[i];
+    let jars = Math.min(this.lot() / JAM_FRUIT, Math.floor(s.jam + 1e-9));
+    if (b.cap) jars = Math.min(jars, Math.floor(s.dem[i] / JAM_FRUIT));
+    if (jars < 1) return 0;
+    s.jam -= jars; s.money += jars * b.price / 100 * JAM_FRUIT * JAM_MULT;
+    if (b.cap) s.dem[i] -= jars * JAM_FRUIT;
+    return jars;
   }
 
   /** 卖一趟果给 nextBuyer()，返回卖掉的个数 */

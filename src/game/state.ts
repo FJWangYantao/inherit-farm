@@ -11,6 +11,12 @@ export interface Flags {
   sell: boolean;
   /** 第一次卖出，出现钱和五金店 */
   sold: boolean;
+  /** 出现 [熬果酱] */
+  jam: boolean;
+  /** 熬出过第一罐果酱，出现 [建作坊] */
+  cooked: boolean;
+  /** 果酱第一次放满，冷藏车上货架 */
+  jamFull: boolean;
   /** 所有东西都买完了 */
   end: boolean;
 }
@@ -22,6 +28,10 @@ export interface GameState {
   money: number;
   trees: number;
   timber: number;
+  /** 果酱罐数 */
+  jam: number;
+  /** 果酱作坊间数 */
+  shops: number;
   /** 仓库扩建过几次 */
   level: number;
   /** TOOLS、TECH、LUX、PROD 各买到第几件 */
@@ -44,9 +54,9 @@ export const LOG_LENGTH = 8;
 
 export function fresh(now = Date.now()): GameState {
   return {
-    fruit: 0, wood: 0, money: 0, trees: 0, timber: 0, level: 0,
+    fruit: 0, wood: 0, money: 0, trees: 0, timber: 0, jam: 0, shops: 0, level: 0,
     tools: 0, tech: 0, lux: 0, prod: 0, dem: BUYERS.map(() => 0),
-    f: { tree: false, cap: false, sell: false, sold: false, end: false },
+    f: { tree: false, cap: false, sell: false, sold: false, jam: false, cooked: false, jamFull: false, end: false },
     log: [T.start],
     played: 0, last: now
   };
