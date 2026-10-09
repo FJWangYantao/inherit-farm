@@ -1,0 +1,127 @@
+/* 标题字体只含游戏里用到的汉字，由 tools/font.ts 生成；西文和数字用 fontsource 的 latin 子集 */
+@font-face{font-family:"ZCOOL XiaoWei";font-style:normal;font-weight:400;font-display:swap;
+  src:url(./fonts/zcool-xiaowei-subset.woff2) format("woff2");unicode-range:U+3000-303F,U+4E00-9FFF,U+FF00-FFEF}
+
+/* 基础重置 */
+html{-webkit-text-size-adjust:100%}
+body{margin:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+/* layout: one narrow ledger column. Story lines on top, the count below them,
+   then what you can do, what is for sale, who buys from you, and the orchard itself at the foot of the page.
+   Everything above the buttons keeps a fixed height so a button never moves under the finger. */
+:root{
+  --ground:#EDF1E6; --paper:#F8FAF3; --ink:#1E2A21; --dim:#627165; --rule:#C8D2C3;
+  --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39; --fruit:#C03F3A; --wood:#8A693D; --coin:#9A7714;
+  --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
+  --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --num:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
+    --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131915; --paper:#1B231D; --ink:#E2EADF; --dim:#8FA093; --rule:#2E3A30;
+  --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63; --fruit:#EE7B72; --wood:#C8A26A; --coin:#DDBB52;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
+.page{max-width:34rem;margin-inline:auto;padding:calc(28px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(44px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));display:flex;flex-direction:column;gap:22px}
+
+.head h1{font-family:var(--display);font-weight:400;font-size:1.55rem;line-height:1.3;letter-spacing:.04em;margin:0;text-wrap:balance}
+.head p{margin:4px 0 0;font-size:.75rem;letter-spacing:.1em;color:var(--dim)}
+.label{margin:0;font-size:.72rem;font-weight:400;letter-spacing:.14em;color:var(--dim)}
+
+/* story lines: newest on top, older ones fade */
+.log{list-style:none;margin:0;padding:0;height:8.5em;overflow:hidden;font-family:var(--display);font-size:1.06rem;line-height:1.7}
+.log li:nth-child(2){opacity:.6}
+.log li:nth-child(3){opacity:.4}
+.log li:nth-child(4){opacity:.27}
+.log li:nth-child(n+5){opacity:.17}
+.log li.new{animation:line-in .5s ease-out}
+
+/* the count */
+.ledger{display:flex;flex-direction:column}
+.row{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:baseline;column-gap:12px;padding-block:7px;border-bottom:1px solid var(--rule)}
+.row.off{visibility:hidden}
+.row .name{display:flex;align-items:center;gap:8px;min-width:3.4em}
+.row .name i{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.row .val{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:1.35rem;font-weight:500;line-height:1.25}
+.row .val small{font-size:.8rem;font-weight:400;color:var(--dim)}
+.row .val b{display:inline-block;font-weight:500}
+.row .val b.bump{animation:bump .12s ease-out}
+.row .rate{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--dim)}
+.row .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--c);transition:width .15s linear}
+.row[data-r="fruit"]{--c:var(--fruit)}
+.row[data-r="wood"]{--c:var(--wood)}
+.row[data-r="money"]{--c:var(--coin)}
+
+/* what you can do */
+.acts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.act{appearance:none;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--ink);border-radius:5px;
+  padding:10px 14px;min-height:60px;text-align:left;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0}
+.act strong{font-size:1.02rem;font-weight:600;letter-spacing:.04em}
+.act span{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.76rem;color:var(--dim)}
+.act:active:not(:disabled){transform:translateY(1px)}
+.act:focus-visible,.dbg button:focus-visible,.tool button:focus-visible{outline:2px solid var(--leaf);outline-offset:2px}
+.act:disabled{border-color:var(--rule);color:var(--dim);cursor:default}
+.act.main{grid-column:1 / -1;background:var(--leaf);border-color:var(--leaf);color:var(--on-leaf);min-height:66px;align-items:center}
+.act.main strong{font-size:1.2rem;letter-spacing:.3em;margin-right:-.3em}
+.act.arrive,.tool.arrive,.buyers.arrive,.buyers li.arrive{animation:arrive .6s ease-out}
+
+/* what is for sale: one thing per shelf */
+.shop{display:flex;flex-direction:column;gap:10px}
+.tool{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 14px;padding:12px 14px;background:var(--paper);border:1px dashed var(--dim);border-radius:5px}
+.tool .label{grid-column:1 / -1}
+.tool .what strong{font-family:var(--display);font-weight:400;font-size:1.2rem;letter-spacing:.06em}
+.tool .what p{margin:0;font-size:.86rem;color:var(--dim)}
+.tool button{appearance:none;font:inherit;font-family:var(--num);font-size:.84rem;font-variant-numeric:tabular-nums;color:var(--ink);background:transparent;border:1px solid var(--ink);border-radius:5px;padding:8px 12px;cursor:pointer;touch-action:manipulation;white-space:nowrap}
+.tool button:disabled{border-color:var(--rule);color:var(--dim);cursor:default}
+
+/* who buys from you */
+.buyers{display:flex;flex-direction:column;gap:4px}
+.buyers .label{display:flex;justify-content:space-between;gap:12px}
+.buyers .label b{font-weight:400;color:var(--ink);letter-spacing:.06em}
+.buyers ul{list-style:none;margin:0;padding:0}
+.buyers li{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px;align-items:start;padding-block:9px;border-bottom:1px solid var(--rule)}
+.buyers .who strong{font-weight:600;display:flex;align-items:center;gap:8px}
+.buyers .who strong::before{content:"";width:7px;height:7px;border-radius:50%;border:1px solid var(--dim);flex:none}
+.buyers li.next .who strong::before{background:var(--leaf);border-color:var(--leaf)}
+.buyers .who p{margin:0;padding-left:15px;font-family:var(--display);font-size:.95rem;color:var(--dim)}
+.buyers .deal{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+.buyers .deal .left{color:var(--dim)}
+.buyers .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--coin)}
+
+/* the orchard */
+.plot{border-top:1px solid var(--rule);padding-top:16px;display:flex;flex-direction:column;gap:12px}
+.trees{display:flex;flex-wrap:wrap;gap:8px 6px;align-items:flex-end}
+.t,.p{position:relative;flex:none;width:14px;height:21px}
+.t::before{content:"";position:absolute;left:0;top:0;width:14px;height:14px;border-radius:50%;
+  background:radial-gradient(circle at 34% 42%,var(--fruit) 0 1.6px,transparent 2.1px),radial-gradient(circle at 70% 66%,var(--fruit) 0 1.6px,transparent 2.1px),var(--leaf)}
+.p::before{content:"";position:absolute;left:1px;top:0;width:12px;height:16px;background:var(--pine);clip-path:polygon(50% 0,100% 100%,0 100%)}
+.t::after,.p::after{content:"";position:absolute;left:6px;bottom:0;width:2px;height:7px;background:var(--wood)}
+.t.new,.p.new{animation:grow .45s ease-out;transform-origin:50% 100%}
+.plot p{margin:0;font-size:.82rem;color:var(--dim)}
+
+/* tuning controls, not part of the game */
+.dbg{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-top:10px;padding-top:12px;border-top:1px dotted var(--rule);font-size:.76rem;color:var(--dim)}
+.dbg .seg{display:flex;gap:4px}
+.dbg button{appearance:none;font:inherit;font-family:var(--num);color:var(--dim);background:transparent;border:1px solid var(--rule);border-radius:4px;padding:3px 9px;cursor:pointer}
+.dbg button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
+.dbg .time{font-family:var(--num);font-variant-numeric:tabular-nums}
+.dbg .push{margin-left:auto}
+
+@keyframes line-in{from{opacity:0;transform:translateY(-4px)}}
+@keyframes arrive{from{opacity:0;transform:translateY(5px)}}
+@keyframes grow{from{transform:scale(.2);opacity:0}}
+@keyframes bump{50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion: reduce){
+  .log li.new,.act.arrive,.tool.arrive,.buyers.arrive,.buyers li.arrive,.t.new,.p.new,.row .val b.bump{animation:none}
+  .row .meter{transition:none}
+}
