@@ -1,5 +1,5 @@
 // 调试面板，只在 npm run dev 时出现，打包后的正式版里没有。
-// 控制台里还可以用 farm.game、farm.game.tick(秒数)、farm.game.buy('lux') 等直接操作。
+// 控制台里还可以用 farm.game.s（状态）、farm.game.tick(秒数)、farm.game.build('hut')、farm.game.research('grafting') 等直接操作。
 
 import { clock } from '../game/format';
 import type { Game } from '../game/game';

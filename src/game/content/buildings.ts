@@ -1,0 +1,78 @@
+import { FARMER_SEASON, ORCHARD_SEASON, STUDY_UNLOCK_WORKERS, TREE_UNLOCK_FRUIT } from '../balance';
+import type { BuildingDef, CraftDef, JobDef } from '../defs';
+
+// 页面里的顺序按出现先后，这里的顺序不影响显示。
+
+export const BUILDINGS: BuildingDef[] = [
+  // ---- 农场 ----
+  { id: 'tree', name: '果树', tab: 'farm', desc: '每棵每秒 +1 果子，冬天不结果',
+    cost: { fruit: 10 }, ratio: 1.15, prod: { fruit: 1 }, group: 'orchard', season: ORCHARD_SEASON, weather: true,
+    show: g => g.s.res.fruit >= TREE_UNLOCK_FRUIT || g.count('tree') > 0,
+    intro: '地上落了不少果核。也许可以种。', first: '种下了第一棵树。它自己会结果。' },
+  { id: 'timber', name: '林木', tab: 'farm', desc: '每棵每秒 +0.5 木头',
+    cost: { fruit: 50 }, ratio: 1.15, prod: { wood: 0.5 }, group: 'forest',
+    show: g => g.s.level >= 1, first: '坡上种了第一棵林木。木头不用自己砍了。' },
+  { id: 'peach', name: '桃树', tab: 'farm', desc: '每棵每秒 +4 果子，夏天最多',
+    cost: { fruit: 1500, wood: 150 }, ratio: 1.18, prod: { fruit: 4 }, group: 'orchard', season: [0.5, 2, 1, 0], weather: true,
+    show: g => g.has('grafting'), first: '种下了第一棵桃树。' },
+  { id: 'citrus', name: '柑橘树', tab: 'farm', desc: '每棵每秒 +6 果子，冬天最多',
+    cost: { fruit: 20000, wood: 2000 }, ratio: 1.18, prod: { fruit: 6 }, group: 'orchard', season: [0.75, 0.5, 1, 1.75], weather: true,
+    show: g => g.has('citrus'), first: '种下了第一棵柑橘树。冬天也有果子收了。' },
+  { id: 'clayPit', name: '土坑', tab: 'farm', desc: '每个每秒 +0.3 黏土',
+    cost: { wood: 150 }, ratio: 1.2, prod: { clay: 0.3 }, group: 'clay',
+    show: g => g.has('brickmaking'), first: '在后坡挖了个土坑，黏土慢慢渗出来。' },
+  { id: 'greenhouse', name: '温室', tab: 'farm', desc: '每间每秒 +15 果子，四季一样',
+    cost: { plank: 300, brick: 300, money: 50000 }, ratio: 1.3, prod: { fruit: 15 }, group: 'orchard',
+    show: g => g.has('greenhouse'), first: '第一间温室搭好了。外面下雪，里面开花。' },
+
+  // ---- 帮工 ----
+  { id: 'hut', name: '工棚', tab: 'crew', desc: '每间住 2 个帮工，每人每秒吃 0.5 个果子',
+    cost: { wood: 50, money: 30 }, ratio: 1.6, housing: 2,
+    show: g => g.owns('saw'),
+    intro: '村里的年轻人听说你这儿缺人手，问有没有地方住。', first: '在果园边上搭了间工棚。' },
+  { id: 'house', name: '砖房', tab: 'crew', desc: '每间住 5 个帮工',
+    cost: { brick: 60, plank: 40 }, ratio: 1.45, housing: 5,
+    show: g => g.has('brickHouse'), first: '盖起了第一间砖房，帮工们住得舒服多了。' },
+
+  // ---- 农技 ----
+  { id: 'library', name: '书屋', tab: 'study', desc: '农技上限 +100，农技员 +5%',
+    cost: { wood: 150, money: 150 }, ratio: 1.3, caps: { science: 100 }, boost: { study: 0.05 },
+    show: g => g.s.workers >= STUDY_UNLOCK_WORKERS || g.count('library') > 0,
+    intro: '帮工小张是农大毕业的，说仓库边上可以搭个书屋。', first: '书屋搭好了，小张把他的书都搬了过来。' },
+  { id: 'station', name: '农技站', tab: 'study', desc: '农技上限 +1,000，农技员 +10%',
+    cost: { brick: 200, plank: 150, money: 30000 }, ratio: 1.3, caps: { science: 1000 }, boost: { study: 0.1 },
+    show: g => g.has('station'), first: '农技站挂牌了，县里的专家说有空会来看看。' },
+
+  // ---- 工坊 ----
+  { id: 'sawmill', name: '锯木坊', tab: 'craft', desc: '每秒用 25 木头做 0.5 块木板',
+    cost: { plank: 50, brick: 50, money: 5000 }, ratio: 1.3, use: { wood: 25 }, prod: { plank: 0.5 }, group: 'mill',
+    show: g => g.has('sawmill'), first: '锯木坊转起来了。' },
+  { id: 'kiln', name: '砖窑', tab: 'craft', desc: '每秒用 10 黏土、5 木头烧 0.5 块砖',
+    cost: { brick: 80, money: 5000 }, ratio: 1.3, use: { clay: 10, wood: 5 }, prod: { brick: 0.5 }, group: 'mill',
+    show: g => g.has('kiln'), first: '砖窑点上了火。' },
+  { id: 'jamShop', name: '果酱作坊', tab: 'craft', desc: '每秒用 100 果子、10 木头熬 1 罐果酱',
+    cost: { money: 100000 }, ratio: 1.6, use: { fruit: 100, wood: 10 }, prod: { jam: 1 }, group: 'mill',
+    show: g => g.s.f.cooked, first: '在坡下盖了间果酱作坊。仓库里的果子和柴火，作坊自己会拿去熬。' },
+  { id: 'coldStore', name: '冷库', tab: 'craft', desc: '果酱上限 +1,000',
+    cost: { brick: 500, plank: 300, money: 1000000 }, ratio: 1.4, caps: { jam: 1000 },
+    show: g => g.has('coldChain'), first: '冷库建好了，果酱能多放不少。' }
+];
+
+export const JOBS: JobDef[] = [
+  { id: 'farmer', name: '果农', desc: '每人每秒 +3 果子，冬天减半', prod: { fruit: 3 }, group: 'farmer',
+    season: FARMER_SEASON, weather: true, show: g => g.s.workers > 0 },
+  { id: 'woodcutter', name: '伐木工', desc: '每人每秒 +1 木头', prod: { wood: 1 }, group: 'forest',
+    show: g => g.s.workers > 0 },
+  { id: 'scholar', name: '农技员', desc: '每人每秒 +0.25 农技', prod: { science: 0.25 }, group: 'study',
+    show: g => g.count('library') > 0 },
+  { id: 'digger', name: '挖土工', desc: '每人每秒 +0.5 黏土', prod: { clay: 0.5 }, group: 'clay',
+    show: g => g.has('brickmaking') },
+  { id: 'seller', name: '推销员', desc: '每人每秒按最好的价卖掉 20 个果子', prod: {}, sells: 20,
+    show: g => g.has('sales') }
+];
+
+export const CRAFTS: CraftDef[] = [
+  { id: 'plank', name: '木板', cost: { wood: 50 }, out: 'plank', show: g => g.has('carpentry') },
+  { id: 'brick', name: '砖', cost: { clay: 20, wood: 10 }, out: 'brick', show: g => g.has('brickmaking') },
+  { id: 'jam', name: '果酱', cost: { fruit: 100, wood: 10 }, out: 'jam', show: g => g.has('jam') }
+];

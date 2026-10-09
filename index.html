@@ -9,79 +9,21 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
 <body>
-<main class="page">
+<div class="page">
+  <!-- 按钮上方的区域（标题、日历、故事、资源、页签）高度都是固定的，新内容出现时按钮不会移位 -->
   <header class="head">
     <h1>毕业后我继承了一个农场</h1>
+    <p class="cal" id="cal"></p>
   </header>
 
   <ol class="log" id="log" aria-live="polite"></ol>
 
-  <section class="ledger" aria-label="库存">
-    <div class="row" data-r="fruit" id="row-fruit">
-      <span class="name"><i></i>果子</span>
-      <span class="val"><b id="v-fruit">0</b><small id="c-fruit"></small></span>
-      <span class="rate" id="r-fruit"></span>
-      <span class="meter" id="m-fruit"></span>
-    </div>
-    <div class="row off" data-r="wood" id="row-wood">
-      <span class="name"><i></i>木头</span>
-      <span class="val"><b id="v-wood">0</b><small id="c-wood"></small></span>
-      <span class="rate" id="r-wood"></span>
-      <span class="meter" id="m-wood"></span>
-    </div>
-    <div class="row off" data-r="money" id="row-money">
-      <span class="name"><i></i>钱</span>
-      <span class="val"><b id="v-money">0</b></span>
-      <span class="rate" id="r-money"></span>
-    </div>
-    <div class="row off" data-r="jam" id="row-jam">
-      <span class="name"><i></i>果酱</span>
-      <span class="val"><b id="v-jam">0</b><small id="c-jam"></small></span>
-      <span class="rate" id="r-jam"></span>
-      <span class="meter" id="m-jam"></span>
-    </div>
-  </section>
+  <section class="res" id="res" aria-label="库存"></section>
 
-  <section class="acts" aria-label="能做的事">
-    <button class="act main" id="b-pick" type="button"><strong>摘果</strong></button>
-    <button class="act" id="b-plant" type="button" hidden><strong>种树</strong><span id="s-plant"></span></button>
-    <button class="act" id="b-chop" type="button" hidden><strong>砍柴</strong><span>+1 木头</span></button>
-    <button class="act" id="b-timber" type="button" hidden><strong>种林木</strong><span id="s-timber"></span></button>
-    <button class="act" id="b-expand" type="button" hidden><strong>扩建仓库</strong><span id="s-expand"></span></button>
-    <button class="act" id="b-sell" type="button" hidden><strong>卖果</strong><span id="s-sell"></span></button>
-    <button class="act" id="b-cook" type="button" hidden><strong>熬果酱</strong><span id="s-cook"></span></button>
-    <button class="act" id="b-selljam" type="button" hidden><strong>卖果酱</strong><span id="s-selljam"></span></button>
-    <button class="act" id="b-shop" type="button" hidden><strong>盖作坊</strong><span id="s-shop"></span></button>
-  </section>
+  <nav class="tabs" id="tabs" aria-label="页面" role="tablist"></nav>
 
-  <div class="shop" id="shop" hidden>
-    <section class="tool" id="card-tech" hidden>
-      <h2 class="label" id="l-tech"></h2>
-      <div class="what"><strong id="n-tech"></strong><p id="d-tech"></p></div>
-      <button id="b-tech" type="button"></button>
-    </section>
-    <section class="tool" id="card-lux" hidden>
-      <h2 class="label" id="l-lux"></h2>
-      <div class="what"><strong id="n-lux"></strong><p id="d-lux"></p></div>
-      <button id="b-lux" type="button"></button>
-    </section>
-    <section class="tool" id="card-prod" hidden>
-      <h2 class="label" id="l-prod"></h2>
-      <div class="what"><strong id="n-prod"></strong><p id="d-prod"></p></div>
-      <button id="b-prod" type="button"></button>
-    </section>
-  </div>
-
-  <section class="buyers" id="buyers" hidden>
-    <h2 class="label"><span>买家</span><b id="face"></b></h2>
-    <ul id="buyer-list"></ul>
-  </section>
-
-  <section class="plot" id="plot" hidden>
-    <div class="trees" id="trees"></div>
-    <p id="plot-cap"></p>
-  </section>
-</main>
+  <main id="pages"></main>
+</div>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

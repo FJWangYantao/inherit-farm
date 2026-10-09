@@ -1,264 +1,330 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUYERS, JAM_MULT, JAM_UNLOCK_WOOD, LUX, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, PROD, TECH, TECH_COLD_TRUCK,
-  TOOLS, cap, expandCost, jamCap, treeCost, workshopCost
-} from '../src/game/config';
+  ARRIVE_SECONDS, FOOD_PER_WORKER, LEAVE_SECONDS, OFFLINE_MAX_SECONDS, ORCHARD_SEASON, SEASON_SECONDS, warehouseCap
+} from '../src/game/balance';
+import { BUILDING, SHELVES, TECHS } from '../src/game/content';
+import { BUYERS } from '../src/game/content/shop';
 import { Game } from '../src/game/game';
 import { fresh, type GameState } from '../src/game/state';
 import { T } from '../src/game/text';
 
-function game(patch: Partial<GameState> = {}): Game {
+type Patch = Omit<Partial<GameState>, 'res' | 'b' | 'jobs' | 'shelves' | 'f' | 'cal'> & {
+  res?: Partial<GameState['res']>; b?: Record<string, number>; jobs?: Record<string, number>;
+  shelves?: Record<string, number>; f?: Partial<GameState['f']>; cal?: Partial<GameState['cal']>;
+};
+
+function game(p: Patch = {}): Game {
   const s = fresh(0);
-  return new Game({ ...s, ...patch, f: { ...s.f, ...patch.f } });
+  const g = new Game({
+    ...s, ...p,
+    res: { ...s.res, ...p.res }, b: { ...s.b, ...p.b }, jobs: { ...s.jobs, ...p.jobs },
+    shelves: { ...s.shelves, ...p.shelves }, f: { ...s.f, ...p.f }, cal: { ...s.cal, ...p.cal },
+    seen: [...s.seen, ...(p.seen ?? [])]
+  });
+  g.check();
+  return g;
+}
+
+/** 把货架买到某一件（不含）为止 */
+function upTo(item: string): Record<string, number> {
+  for (const sh of SHELVES) {
+    const i = sh.items.findIndex(x => x.id === item);
+    if (i >= 0) return { [sh.id]: i };
+  }
+  throw new Error(item);
 }
 
 describe('开局', () => {
-  it('只有摘果，摘到 10 个出现种树', () => {
+  it('只有摘果；摘到 10 个出现果树', () => {
     const g = game();
-    expect(g.plant()).toBe(false);
+    expect(g.entries('farm')).toEqual(['act:pick']);
     for (let i = 0; i < 9; i++) g.pick();
-    expect(g.s.f.tree).toBe(false);
+    expect(g.isSeen('b:tree')).toBe(false);
     g.pick();
-    expect(g.s.f.tree).toBe(true);
-    expect(g.s.log[0]).toBe(T.canPlant);
-    expect(g.plant()).toBe(true);
-    expect(g.s.fruit).toBe(10 - treeCost(0));
-    expect(g.s.log[0]).toBe(T.firstTree);
+    expect(g.entries('farm')).toEqual(['act:pick', 'b:tree']);
+    expect(g.s.log[0]).toBe(BUILDING.get('tree')!.intro);
+    expect(g.build('tree')).toBe(true);
+    expect(g.s.res.fruit).toBe(0);
+    expect(g.s.log[0]).toBe(BUILDING.get('tree')!.first);
   });
 
-  it('树每秒产果，满仓后停在上限并出现砍柴和扩建', () => {
-    const g = game({ trees: 10, f: { tree: true } as GameState['f'] });
+  it('树每秒产果，满仓后停在上限并出现木头、砍柴和扩建', () => {
+    const g = game({ b: { tree: 10 } });
     g.tick(5);
-    expect(g.s.fruit).toBe(50);
+    expect(g.s.res.fruit).toBe(50);
     g.tick(100);
-    expect(g.s.fruit).toBe(cap(0));
+    expect(g.s.res.fruit).toBe(warehouseCap(0));
     expect(g.s.f.cap).toBe(true);
-    expect(g.chop()).toBe(true);
-    expect(g.s.wood).toBe(1);
+    expect(g.isSeen('res:wood') && g.isSeen('act:chop') && g.isSeen('act:expand')).toBe(true);
+    expect(g.gather('wood')).toBe(true);
+    expect(g.s.res.wood).toBe(1);
   });
-});
 
-describe('仓库', () => {
-  it('扩建花掉一仓果子和木头，上限变成 5 倍', () => {
-    const g = game({ fruit: 100, wood: 20, f: { cap: true } as GameState['f'] });
+  it('扩建花掉一仓果子和木头，上限变成 5 倍，出现林木', () => {
+    const g = game({ res: { fruit: 100, wood: 20 }, f: { cap: true } });
     expect(g.expand()).toBe(true);
-    expect(g.s).toMatchObject({ level: 1, fruit: 0, wood: 0 });
-    expect(g.cap()).toBe(500);
+    expect(g.s).toMatchObject({ level: 1, res: expect.objectContaining({ fruit: 0, wood: 0 }) });
+    expect(g.cap('fruit')).toBe(500);
+    expect(g.isSeen('b:timber')).toBe(true);
   });
 
-  it('第四次起扩建要上限 40% 的木头', () => {
-    expect(expandCost(3)).toEqual({ fruit: 12500, wood: 5000 });
-  });
-
-  it('木头也受仓库上限限制', () => {
-    const g = game({ timber: 100, level: 1 });
-    g.tick(100);
-    expect(g.s.wood).toBe(cap(1));
+  it('果树到 30 棵出现卖果，第一次卖出出现钱和集市', () => {
+    const g = game({ b: { tree: 30 }, res: { fruit: 250 } });
+    expect(g.isSeen('act:sell')).toBe(true);
+    expect(g.sell('fruit')).toBe(100);
+    expect(g.s.res.money).toBe(10);
+    g.check();
+    expect(g.isSeen('res:money') && g.isSeen('tab:market') && g.isSeen('shelf:hardware')).toBe(true);
   });
 });
 
-describe('卖果', () => {
-  it('没解锁时卖不了', () => {
-    expect(game({ fruit: 500 }).sell()).toBe(0);
+describe('建筑', () => {
+  it('价格按指数涨，不够钱盖不了', () => {
+    const g = game({ seen: ['b:hut'], res: { wood: 1000, money: 1000 } });
+    const c0 = g.costOf('hut');
+    expect(g.build('hut')).toBe(true);
+    const c1 = g.costOf('hut');
+    expect(c1.wood).toBe(Math.ceil(c0.wood! * BUILDING.get('hut')!.ratio));
+    g.s.res.money = 0;
+    expect(g.build('hut')).toBe(false);
   });
 
-  it('一趟卖 100 个给村口，第一次卖出出现钱', () => {
-    const g = game({ fruit: 250, f: { sell: true } as GameState['f'] });
-    expect(g.sell()).toBe(100);
-    expect(g.s.money).toBe(10);
-    expect(g.s.f.sold).toBe(true);
-    expect(g.s.log[0]).toBe(T.firstSale);
+  it('没出现的建筑盖不了', () => {
+    expect(game({ res: { wood: 1e6, money: 1e6 } }).build('hut')).toBe(false);
   });
 
-  it('有面子时卖给出价最高、还收得下的买家，收购量会用完', () => {
-    const dem = [0, 3000, 150, 0];
-    const g = game({ fruit: 5000, lux: 2, tech: 1, dem, f: { sell: true, sold: true } as GameState['f'] });
+  it('加工建筑按比例：原料不够或产品放不下就少做', () => {
+    const g = game({ seen: ['b:sawmill'], b: { sawmill: 2 }, level: 3, res: { wood: 30 } });
+    g.tick(1);
+    // 两间每秒要 50 木头，只有 30，所以做 0.6 块
+    expect(g.s.res.plank).toBeCloseTo(0.6);
+    expect(g.s.res.wood).toBeCloseTo(0);
+    g.s.res.wood = 1e4;
+    g.s.res.plank = g.cap('plank') - 0.5;
+    g.tick(1);
+    expect(g.s.res.plank).toBeCloseTo(g.cap('plank'));
+    expect(g.s.res.wood).toBeCloseTo(1e4 - 25);
+  });
+});
+
+describe('帮工', () => {
+  const crew = { seen: ['b:hut'], b: { hut: 2 }, res: { fruit: 90 } };
+
+  it('有床位、有果子时每 15 秒来一个人，第一个人来了开始有季节', () => {
+    const g = game({ ...crew, level: 3, res: { fruit: 5000 } });
+    g.tick(ARRIVE_SECONDS - 1);
+    expect(g.s.workers).toBe(0);
+    g.tick(1);
+    expect(g.s.workers).toBe(1);
+    expect(g.s.cal.on).toBe(true);
+    expect(g.s.log).toContain(T.firstWorker);
+    expect(g.isSeen('job:farmer') && g.isSeen('job:woodcutter')).toBe(true);
+    g.tick(ARRIVE_SECONDS * 10);
+    expect(g.s.workers).toBe(g.housing());
+  });
+
+  it('派活和收回，闲着的人不能是负数', () => {
+    const g = game({ ...crew, workers: 3, seen: ['b:hut', 'job:farmer', 'job:woodcutter'] });
+    expect(g.assign('farmer', 5)).toBe(3);
+    expect(g.idle()).toBe(0);
+    expect(g.assign('woodcutter', 1)).toBe(0);
+    expect(g.assign('farmer', -2)).toBe(2);
+    expect(g.s.jobs.farmer).toBe(1);
+  });
+
+  it('每人每秒吃 0.5 个果子；吃光了每 10 秒走一个，先走闲着的', () => {
+    const g = game({ ...crew, workers: 4, jobs: { woodcutter: 3 }, res: { fruit: 4 * FOOD_PER_WORKER } });
+    g.tick(1);
+    expect(g.s.res.fruit).toBe(0);
+    expect(g.s.workers).toBe(4);
+    g.tick(1);
+    expect(g.s.log[0]).toBe(T.hungry);
+    g.tick(LEAVE_SECONDS);
+    expect(g.s.workers).toBe(3);
+    expect(g.s.jobs.woodcutter).toBe(3);
+    g.tick(LEAVE_SECONDS);
+    expect(g.s.workers).toBe(2);
+    expect(g.s.jobs.woodcutter).toBe(2);
+  });
+
+  it('果农和推销员', () => {
+    const g = game({ workers: 2, jobs: { farmer: 1, seller: 1 }, res: { fruit: 1000 }, level: 3 });
+    const before = g.s.res.fruit;
+    g.tick(1);
+    // 果农 +3，吃掉 1，推销员卖掉 20
+    expect(g.s.res.fruit).toBeCloseTo(before + 3 - 2 * FOOD_PER_WORKER - 20);
+    expect(g.s.res.money).toBeCloseTo(20 * BUYERS[0].price / 100);
+  });
+});
+
+describe('季节和天气', () => {
+  it('没有日历时没有季节；有了以后苹果树冬天不结果', () => {
+    const g = game({ b: { tree: 10 }, level: 5 });
+    expect(g.season()).toBe(-1);
+    g.s.cal.on = true;
+    g.s.cal.t = SEASON_SECONDS * 3 + 1;
+    const f0 = g.s.res.fruit;
+    g.tick(1);
+    expect(g.season()).toBe(3);
+    expect(g.s.res.fruit).toBe(f0);
+    g.s.cal.t = SEASON_SECONDS * 2 + 1;
+    g.s.cal.weather = 0;
+    g.tick(1);
+    expect(g.s.res.fruit - f0).toBeCloseTo(10 * ORCHARD_SEASON[2]);
+  });
+
+  it('天气由存档里的种子决定，同样的种子同样的天气', () => {
+    const a = game({ cal: { on: true, rng: 7 } }), b = game({ cal: { on: true, rng: 7 } });
+    const wa: number[] = [], wb: number[] = [];
+    for (let i = 0; i < 40; i++) {
+      a.tick(SEASON_SECONDS); b.tick(SEASON_SECONDS);
+      wa.push(a.s.cal.weather); wb.push(b.s.cal.weather);
+    }
+    expect(wa).toEqual(wb);
+    expect(new Set(wa).size).toBeGreaterThan(1);
+  });
+
+  it('旱灾 −30%；研究灌溉后不怕旱，研究气象后坏天气减半', () => {
+    const g = game({ cal: { on: true, weather: 2 } });
+    expect(g.weatherMult()).toBeCloseTo(0.7);
+    g.s.techs.push('meteorology');
+    expect(new Game(g.s).weatherMult()).toBeCloseTo(0.85);
+    g.s.techs.push('irrigation');
+    expect(new Game(g.s).weatherMult()).toBe(1);
+    g.s.cal.weather = -1;
+    expect(new Game(g.s).weatherMult()).toBeCloseTo(0.85);
+  });
+});
+
+describe('农技', () => {
+  it('盖了书屋才出现农技和科技；研究要先研究前置', () => {
+    const g = game({ workers: 3, res: { wood: 1000, money: 1000 } });
+    expect(g.isSeen('b:library')).toBe(true);
+    expect(g.isSeen('tech:farming')).toBe(false);
+    g.build('library');
+    g.check();
+    expect(g.isSeen('tech:farming') && g.isSeen('tech:grafting') && g.isSeen('act:read')).toBe(true);
+    expect(g.isSeen('tech:citrus')).toBe(false);
+    expect(g.entries('study').slice(0, 3)).toEqual(['b:library', 'act:read', 'tech:farming']);
+    expect(g.cap('science')).toBe(100);
+  });
+
+  it('研究花掉农技，加成生效，出现新东西', () => {
+    const g = game({ seen: ['res:science'], b: { library: 1, tree: 10 }, res: { science: 100 } });
+    const r0 = g.rates().fruit;
+    expect(g.research('grafting')).toBe(true);
+    expect(g.s.res.science).toBe(40);
+    expect(g.rates().fruit).toBeCloseTo(r0 * 1.2);
+    expect(g.isSeen('b:peach') && g.isSeen('tech:citrus')).toBe(true);
+    expect(g.research('grafting')).toBe(false);
+  });
+
+  it('书屋给农技员加成，藏书加农技上限', () => {
+    const g = game({ seen: ['res:science'], b: { library: 4, station: 1 }, workers: 1, jobs: { scholar: 1 } });
+    // 同一组的加成相加：4 间书屋 +20%，1 间农技站 +10%
+    expect(g.rates().science).toBeCloseTo(0.25 * 1.3);
+    expect(g.cap('science')).toBe(1400);
+    g.s.techs.push('catalog');
+    expect(new Game(g.s).cap('science')).toBe(2100);
+  });
+});
+
+describe('手工', () => {
+  it('做多少受原料和上限限制；第一罐果酱出现作坊', () => {
+    const g = game({ techs: ['carpentry', 'jam'], level: 3, res: { wood: 1000, fruit: 300 } });
+    expect(g.craftable('plank')).toBe(20);
+    expect(g.craft('plank', 100)).toBe(20);
+    expect(g.s.res.wood).toBe(0);
+    g.s.res.wood = 100;
+    expect(g.craft('jam', 10)).toBe(3);
+    expect(g.s.f.cooked).toBe(true);
+    expect(g.s.log[0]).toBe(T.firstJar);
+    g.check();
+    expect(g.isSeen('b:jamShop') && g.isSeen('act:sellJam')).toBe(true);
+  });
+});
+
+describe('货架和买家', () => {
+  it('五金店一件一件卖，卖到冷藏车要等果酱放满过', () => {
+    const g = game({ f: { sold: true }, res: { money: 1e9, wood: 1000 }, shelves: upTo('coldTruck') });
+    expect(g.shelfItem('hardware')).toBeUndefined();
+    expect(g.shelfDone('hardware')).toBe(false);
+    g.s.f.jamFull = true;
+    expect(g.shelfItem('hardware')!.id).toBe('coldTruck');
+    expect(g.buyShelf('hardware')).toBe(true);
+    expect(g.flag('coldTruck')).toBe(true);
+    g.buyShelf('hardware');
+    expect(g.shelfDone('hardware')).toBe(true);
+    expect(g.lot()).toBe(1000000);
+  });
+
+  it('买奢侈品加面子，新认识的买家一开始收得满', () => {
+    const g = game({ res: { money: 1e9 }, shelves: { hardware: 5 } });
+    expect(g.isSeen('shelf:lux')).toBe(true);
+    g.buyShelf('lux');
+    expect(g.face()).toBe(1);
+    expect(g.s.dem[1]).toBe(BUYERS[1].cap);
+    expect(g.isSeen('shelf:prod')).toBe(true);
+  });
+
+  it('卖给出价最高、还收得下的买家；果酱一罐按 100 个算、3 倍价', () => {
+    const dem = BUYERS.map(() => 0);
+    dem[2] = 150;
+    const g = game({ res: { fruit: 5000, jam: 50 }, shelves: { hardware: 5, lux: 2 }, dem,
+      seen: ['act:sell', 'act:sellJam'] });
     expect(g.nextBuyer()).toBe(2);
-    expect(g.sell()).toBe(100);
-    expect(g.s.money).toBe(40);
-    expect(g.nextBuyer()).toBe(1);
-    expect(g.sell()).toBe(1000);
-    expect(g.s.dem[1]).toBe(2000);
+    expect(g.sell('fruit')).toBe(100);
+    expect(g.s.res.money).toBeCloseTo(BUYERS[2].price);
+    expect(g.nextBuyer()).toBe(0);
+    expect(g.sell('jam')).toBe(10);
+    expect(g.s.res.money).toBeCloseTo(BUYERS[2].price + 10 * BUYERS[0].price * 3);
   });
 
   it('果摊把放不下的果子按出价从高到低卖掉', () => {
+    const dem = BUYERS.map(() => 0);
+    dem[1] = 10;
+    const g = game({ res: { fruit: 100 }, b: { tree: 100 }, shelves: { hardware: 3, lux: 1 }, dem });
     // 有梯子，100 棵树一秒产 150 个，全部溢出；小贩收购量先恢复到 50
-    const g = game({ fruit: 100, trees: 100, tools: 3, lux: 1, dem: [0, 10, 0, 0] });
     const got = g.tick(1);
-    // 50 个给小贩（20 钱/100 个），100 个给王婶（10 钱/100 个）
-    expect(got).toBeCloseTo(20);
-    expect(g.s.dem[1]).toBe(0);
-    expect(g.s.fruit).toBe(100);
-  });
-
-  it('买家的收购量按秒恢复，不超过上限', () => {
-    const g = game({ lux: 1 });
-    g.tick(10);
-    expect(g.s.dem[1]).toBe(BUYERS[1].refill * 10);
-    g.tick(1000);
-    expect(g.s.dem[1]).toBe(BUYERS[1].cap);
-  });
-});
-
-describe('商店', () => {
-  it('五金店一件一件卖，买完换成科技工具', () => {
-    const g = game({ money: 1e6, wood: 1000, level: 2, f: { sold: true } as GameState['f'] });
-    expect(g.shelfItem('tech')).toBeUndefined();
-    for (const t of TOOLS) {
-      expect(g.shelfItem('tools')).toBe(t);
-      expect(g.buy('tools')).toBe(true);
-    }
-    expect(g.shelfItem('tools')).toBeUndefined();
-    expect(g.shelfItem('tech')).toBe(TECH[0]);
-    expect(g.shelfItem('lux')).toBeUndefined();
-  });
-
-  it('钱或木头不够买不了', () => {
-    const g = game({ money: 1e6, wood: 0, tools: 2, f: { sold: true } as GameState['f'] });
-    expect(g.buy('tools')).toBe(false);
-    g.s.wood = 300;
-    expect(g.buy('tools')).toBe(true);
-    expect(g.s.wood).toBe(0);
-  });
-
-  it('买手推车出现奢侈品，买新衣服出现生产工具，新买家一开始收满', () => {
-    const g = game({ money: 1e6, tools: TOOLS.length, f: { sold: true } as GameState['f'] });
-    g.buy('tech');
-    expect(g.lot()).toBe(TECH[0].lot);
-    expect(g.shelfItem('lux')).toBe(LUX[0]);
-    g.buy('lux');
-    expect(g.s.dem[1]).toBe(BUYERS[1].cap);
-    expect(g.shelfItem('prod')).toBe(PROD[0]);
-  });
-
-  it('全部买完到结尾', () => {
-    const g = game({ money: 1e9, tools: TOOLS.length, f: { sold: true, jamFull: true } as GameState['f'] });
-    while (g.buy('tech') || g.buy('lux') || g.buy('prod')) { /* 买到没得买 */ }
-    expect(g.s).toMatchObject({ tech: TECH.length, lux: LUX.length, prod: PROD.length });
-    expect(g.s.f.end).toBe(true);
-    expect(g.s.log[0]).toBe(T.end);
-  });
-
-  it('旧版本到过结尾的存档，有了新内容就收回结尾那句', () => {
-    const g = game({ tools: TOOLS.length, tech: 2, lux: 3, prod: 3, log: [T.end, '更早的一句'], f: { end: true } as GameState['f'] });
-    g.check();
-    expect(g.s.f.end).toBe(false);
-    expect(g.s.log).toEqual(['更早的一句']);
-  });
-
-  it('科技工具：冷藏车要等果酱放满过才上货架，它不改一趟的量', () => {
-    const g = game({ money: 1e9, tools: TOOLS.length, tech: TECH_COLD_TRUCK - 1, f: { sold: true } as GameState['f'] });
-    expect(g.shelfItem('tech')).toBeUndefined();
-    g.s.f.jamFull = true;
-    expect(g.shelfItem('tech')).toBe(TECH[TECH_COLD_TRUCK - 1]);
-    const before = g.lot();
-    g.buy('tech');
-    expect(g.lot()).toBe(before);
-    expect(g.hasColdTruck()).toBe(true);
-  });
-
-  it('产量加成相乘', () => {
-    const g = game({ trees: 10, tools: TOOLS.length, prod: 2 });
-    expect(g.fruitRate()).toBeCloseTo(10 * 1.5 * 1.5 * 1.5 * 1.5);
+    expect(got).toBeCloseTo(50 * BUYERS[1].price / 100 + 100 * BUYERS[0].price / 100);
+    expect(g.s.res.fruit).toBe(100);
   });
 });
 
 describe('时间', () => {
   it('一次推进很久和一秒一秒推进结果一样', () => {
-    const base = { trees: 200, tools: 3, lux: 3, level: 2, timber: 5 };
-    const a = game(base), b = game(base);
-    a.tick(600);
-    for (let i = 0; i < 600; i++) b.tick(1);
-    expect(a.s.money).toBeCloseTo(b.s.money, 6);
-    expect(a.s.dem).toEqual(b.s.dem.map(x => expect.closeTo(x, 6)));
+    const p: Patch = { b: { tree: 200, timber: 5, hut: 5 }, shelves: { hardware: 3, lux: 3 }, level: 2, res: { fruit: 500 } };
+    const a = game(p), b = game(p);
+    a.tick(3000);
+    for (let i = 0; i < 3000; i++) b.tick(1);
+    expect(a.s.res.money).toBeCloseTo(b.s.res.money, 6);
+    expect(a.s.workers).toBe(b.s.workers);
+    expect(a.s.cal).toEqual(b.s.cal);
   });
-});
 
-describe('离线', () => {
-  const base = { trees: 200, tools: 3, lux: 2, level: 2, timber: 5 };
-
-  it('离开时间有上限，并按效率折算', () => {
-    const a = game(base), b = game(base);
-    expect(a.catchUp(8 * 3600)).toBe(OFFLINE_MAX_SECONDS * OFFLINE_EFFICIENCY);
-    b.tick(OFFLINE_MAX_SECONDS * OFFLINE_EFFICIENCY);
-    expect(a.s.money).toBeCloseTo(b.s.money, 6);
+  it('离线最多补算 12 小时，回来报一句收获', () => {
+    const g = game({ b: { tree: 50 }, shelves: { hardware: 3 }, level: 3 });
+    expect(g.catchUp(30 * 3600)).toBe(OFFLINE_MAX_SECONDS);
+    expect(g.s.log[0]).toMatch(/^你离开了 30 小时 0 分钟。.*钱 \+/);
   });
 
   it('离开不到几秒照常推进，不报收获', () => {
-    const a = game(base), b = game(base);
-    a.catchUp(3);
-    b.tick(3);
-    expect(a.s.money).toBeCloseTo(b.s.money, 6);
-    expect(a.s.log.some(line => line.startsWith('你离开了'))).toBe(false);
-  });
-
-  it('离开一分钟以上回来报一句收获', () => {
-    const g = game(base);
-    g.catchUp(2 * 3600 + 5 * 60);
-    expect(g.s.log[0]).toMatch(/^你离开了 2 小时 5 分钟。.*钱 \+/);
+    const g = game({ b: { tree: 50 }, level: 3 });
+    g.catchUp(3);
+    expect(g.s.res.fruit).toBeCloseTo(150);
+    expect(g.s.log.some(l => l.startsWith('你离开了'))).toBe(false);
   });
 });
 
-describe('果酱', () => {
-  const ready = { f: { jam: true } as GameState['f'], fruit: 1000, wood: 1000, level: 3 };
-
-  it('有了房、木头攒够了出现熬果酱', () => {
-    const g = game({ lux: 3, wood: JAM_UNLOCK_WOOD - 1, level: 4 });
+describe('结尾', () => {
+  it('研究完所有科技、买完所有货架就到结尾；有了新内容会收回结尾那句', () => {
+    const shelves = Object.fromEntries(SHELVES.map(sh => [sh.id, sh.items.length]));
+    const g = game({ techs: TECHS.map(t => t.id), shelves });
+    expect(g.s.f.end).toBe(true);
+    expect(g.s.log[0]).toBe(T.end);
+    g.s.techs.pop();
     g.check();
-    expect(g.s.f.jam).toBe(false);
-    g.s.wood = JAM_UNLOCK_WOOD;
-    g.check();
-    expect(g.s.f.jam).toBe(true);
-    expect(g.s.log[0]).toBe(T.canJam);
-  });
-
-  it('手动熬一罐花 100 果子和 10 木头，第一罐之后出现作坊', () => {
-    const g = game(ready);
-    expect(g.buildShop()).toBe(false);
-    expect(g.cook()).toBe(true);
-    expect(g.s).toMatchObject({ fruit: 900, wood: 990, jam: 1 });
-    expect(g.s.log).toContain(T.firstJar);
-    g.s.money = workshopCost(0);
-    expect(g.buildShop()).toBe(true);
-    expect(g.s.money).toBe(0);
-    expect(workshopCost(1)).toBeGreaterThan(workshopCost(0));
-  });
-
-  it('作坊从仓库拿果子和木头，每秒每间熬一罐，木头不够就停', () => {
-    const g = game({ ...ready, shops: 2, wood: 25, f: { jam: true, cooked: true } as GameState['f'] });
-    g.tick(1);
-    expect(g.s).toMatchObject({ jam: 2, fruit: 800, wood: 5 });
-    g.tick(1);
-    expect(g.s.jam).toBeCloseTo(2.5);
-    expect(g.s.wood).toBeCloseTo(0);
-  });
-
-  it('果酱有上限，放满了作坊停火并出现冷藏车', () => {
-    const c = jamCap(3);
-    const g = game({ ...ready, fruit: 10000, wood: 1e4, shops: 3, jam: c - 1, f: { jam: true, cooked: true } as GameState['f'] });
-    g.tick(1);
-    expect(g.s.jam).toBe(c);
-    expect(g.s.fruit).toBe(10000 - 100);
-    expect(g.s.f.jamFull).toBe(true);
-    expect(g.s.log[0]).toBe(T.jamFull);
-    expect(g.cook()).toBe(false);
-  });
-
-  it('有冷藏车以后，放不下的果酱按果酱价卖掉', () => {
-    const c = jamCap(3);
-    const g = game({ ...ready, fruit: 10000, wood: 1e4, shops: 3, jam: c, tech: TECH_COLD_TRUCK,
-      f: { jam: true, cooked: true, jamFull: true } as GameState['f'] });
-    const got = g.tick(1);
-    expect(g.s.jam).toBe(c);
-    expect(got).toBeCloseTo(3 * BUYERS[0].price * JAM_MULT);
-  });
-
-  it('卖果酱给出价最高的买家，一罐按 100 个果子的量算', () => {
-    const g = game({ jam: 50, lux: 3, tech: 2, dem: [0, 0, 0, 1000], f: { cooked: true } as GameState['f'] });
-    expect(g.sellJam()).toBe(10);
-    expect(g.s.money).toBe(10 * BUYERS[3].price * JAM_MULT);
-    expect(g.s.dem[3]).toBe(0);
-    expect(g.sellJam()).toBe(40);
-    expect(g.s.jam).toBe(0);
+    expect(g.s.f.end).toBe(false);
+    expect(g.s.log).not.toContain(T.end);
   });
 });

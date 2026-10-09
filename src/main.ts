@@ -3,13 +3,17 @@ import '@fontsource/ibm-plex-mono/latin-400.css';
 import '@fontsource/ibm-plex-mono/latin-500.css';
 import './styles.css';
 
-import { OFFLINE_MIN_SECONDS } from './game/config';
+import { OFFLINE_MIN_SECONDS } from './game/balance';
+import { ACTION, TAB } from './game/content';
+import type { TabId } from './game/defs';
 import { Game } from './game/game';
 import { load, save } from './game/save';
 import { View } from './ui/view';
 
 const SAVE_EVERY = 5;
 const FRAME_MS = 100;
+/** 上次看的是哪一页，只是方便，存不了也没关系 */
+const TAB_KEY = 'inherit-farm-tab';
 
 function storage(): Storage | null {
   try { return window.localStorage; } catch { return null; }
@@ -18,9 +22,21 @@ function storage(): Storage | null {
 const store = storage();
 const saved = store ? load(store) : null;
 const game = new Game(saved ?? undefined);
-if (saved) game.catchUp((Date.now() - saved.last) / 1000);
+if (saved) {
+  game.check(true);
+  game.catchUp((Date.now() - saved.last) / 1000);
+}
+game.check();
 
-const view = new View(game);
+let lastTab: TabId = 'farm';
+try {
+  const t = store?.getItem(TAB_KEY) as TabId | null;
+  if (t && TAB.has(t)) lastTab = t;
+} catch { /* 用默认的农场页 */ }
+
+const view = new View(game, lastTab, tab => {
+  try { store?.setItem(TAB_KEY, tab); } catch { /* 记不住就算了 */ }
+});
 /** 游戏时间的倍速，只有调试面板会改 */
 let speed = 1;
 
@@ -29,23 +45,26 @@ function persist(): void {
   if (store) save(store, game.s);
 }
 
-function wire(id: string, action: () => unknown): void {
-  document.getElementById(id)!.addEventListener('click', () => { action(); view.render(); });
-}
-wire('b-pick', () => { game.pick(); view.bumpFruit(); });
-wire('b-plant', () => game.plant());
-wire('b-chop', () => game.chop());
-wire('b-timber', () => game.plantTimber());
-wire('b-expand', () => game.expand());
-wire('b-sell', () => game.sell());
-wire('b-cook', () => game.cook());
-wire('b-selljam', () => game.sellJam());
-wire('b-shop', () => game.buildShop());
-wire('b-tech', () => game.buy(game.shelfItem('tools') ? 'tools' : 'tech'));
-wire('b-lux', () => game.buy('lux'));
-wire('b-prod', () => game.buy('prod'));
+// 页里所有按钮的点击都在这里处理，按钮上的 data-op、data-id、data-n 说明要做什么
+document.getElementById('pages')!.addEventListener('click', ev => {
+  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-op]');
+  if (!el || (el as HTMLButtonElement).disabled) return;
+  const id = el.dataset.id!, n = Number(el.dataset.n ?? 0);
+  switch (el.dataset.op) {
+    case 'act':
+      ACTION.get(id)!.run(game);
+      if (id === 'pick') view.bumpFruit();
+      break;
+    case 'build': game.build(id); break;
+    case 'tech': game.research(id); break;
+    case 'shelf': game.buyShelf(id); break;
+    case 'job': game.assign(id, n); break;
+    case 'craft': game.craft(id, n); break;
+  }
+  view.render();
+});
 
-// 页面在后台的时间（切到别的 App、锁屏、切标签页）一律按离线规则补算，不然离线上限就形同虚设
+// 页面在后台的时间（切到别的 App、锁屏、切标签页）一律按离线规则补算
 let prev = performance.now(), sinceSave = 0, hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {

@@ -1,129 +1,233 @@
 // 把游戏状态画到页面上。只读 Game，不改规则。
-// 布局约定：按钮上方的区域高度固定，新内容出现时已有的按钮不移位。
+// 布局约定（设计规则 9）：页签以上的区域高度固定；每一页的条目按出现先后只往后加，
+// 条目的高度也固定，所以新东西出现时已有的按钮不会移位。
 
+import { BASE_LOT, SEASONS } from '../game/balance';
 import {
-  BUYERS, JAM_FRUIT, JAM_MULT, JAM_WOOD, LUX, TOOLS, WORKSHOP_RATE, expandCost, timberCost, treeCost, workshopCost
-} from '../game/config';
+  ACTION, BUILDING, CRAFT, JOB, SHELF, TAB, TECH, entryKind, entryTab
+} from '../game/content';
+import { BUYERS, PRODUCTS } from '../game/content/shop';
+import { resName } from '../game/content/resources';
+import type { Amounts, ResId, TabId } from '../game/defs';
 import { fmt, fmtRate } from '../game/format';
-import type { Game, Shelf } from '../game/game';
+import type { Game } from '../game/game';
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error('页面上缺少 #' + id);
   return el;
 }
-function btn(id: string): HTMLButtonElement {
-  return $(id) as HTMLButtonElement;
+function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, html?: string): HTMLElementTagNameMap[K] {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (html) el.innerHTML = html;
+  return el;
 }
-function setText(el: Element, text: string): void {
-  if (el.textContent !== text) el.textContent = text;
+function setText(el: Element | null, text: string): void {
+  if (el && el.textContent !== text) el.textContent = text;
 }
-/** 第一次出现时播一下入场动画 */
-function show(el: HTMLElement, on: boolean): void {
-  if (on && el.hidden) { el.hidden = false; el.classList.add('arrive'); }
-  else if (!on && !el.hidden) el.hidden = true;
+function setHTML(el: Element | null, html: string): void {
+  if (el && el.innerHTML !== html) el.innerHTML = html;
 }
 function replay(el: HTMLElement, cls: string): void {
   el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
 }
+function escape(s: string): string {
+  return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+}
+
+/** 果园图里画哪些东西，按这个顺序 */
+const PLOT = ['tree', 'peach', 'citrus', 'timber', 'greenhouse'] as const;
+const PLOT_MAX = 60;
+
+interface Page { root: HTMLElement; list: HTMLElement; foot: HTMLElement }
 
 export class View {
-  /** 果摊每秒卖到的钱，主循环每帧更新 */
+  /** 自动卖到的钱每秒多少（果摊、冷藏车、推销员），主循环每帧更新 */
   stallRate = 0;
+  tab: TabId;
+  private pages = new Map<TabId, Page>();
+  private tabBtns = new Map<TabId, HTMLButtonElement>();
+  private nodes = new Map<string, HTMLElement>();
+  private cells = new Map<ResId, HTMLElement>();
+  private built = 0;
+  private dots = new Set<TabId>();
 
-  constructor(private game: Game) {}
+  constructor(private game: Game, tab: TabId, private onTab: (tab: TabId) => void) {
+    this.tab = tab;
+  }
 
-  /** 换了一局（重新开始）后清掉入场动画和缓存的列表 */
+  /** 换了一局（重新开始）后整个重画 */
   reset(): void {
+    for (const id of ['res', 'tabs', 'pages', 'log']) $(id).textContent = '';
+    this.pages.clear(); this.tabBtns.clear(); this.nodes.clear(); this.cells.clear(); this.dots.clear();
+    this.built = 0;
     this.stallRate = 0;
-    document.querySelectorAll('.arrive').forEach(el => el.classList.remove('arrive'));
-    $('buyer-list').textContent = '';
-    $('trees').textContent = '';
+    this.tab = 'farm';
   }
 
   bumpFruit(): void {
-    replay($('v-fruit'), 'bump');
+    const b = this.cells.get('fruit')?.querySelector('b');
+    if (b) replay(b as HTMLElement, 'bump');
+  }
+
+  select(tab: TabId): void {
+    if (!this.tabBtns.has(tab)) return;
+    this.tab = tab;
+    this.dots.delete(tab);
+    this.onTab(tab);
+    this.render();
   }
 
   render(): void {
-    const g = this.game, s = g.s, c = g.cap();
-
+    this.build();
+    if (!this.tabBtns.has(this.tab)) this.tab = 'farm';
+    this.renderHead();
     this.renderLog();
+    this.renderRes();
+    for (const [id, btn] of this.tabBtns) {
+      btn.setAttribute('aria-selected', String(id === this.tab));
+      btn.classList.toggle('dot', this.dots.has(id));
+    }
+    for (const [id, page] of this.pages) page.root.hidden = id !== this.tab;
+    const page = this.pages.get(this.tab);
+    if (!page) return;
+    for (const e of this.game.entries(this.tab)) this.renderEntry(e);
+    this.renderFoot(this.tab, page.foot);
+  }
 
-    // 库存
-    setText($('v-fruit'), fmt(s.fruit));
-    setText($('c-fruit'), s.f.cap ? ' / ' + fmt(c) : '');
-    setText($('r-fruit'), s.trees > 0 ? fmtRate(g.fruitRate()) : '');
-    $('m-fruit').style.width = s.f.cap ? Math.min(100, s.fruit / c * 100) + '%' : '0';
+  // ---- 新出现的东西：建节点，按出现先后往后加 ----
 
-    $('row-wood').classList.toggle('off', !s.f.cap);
-    setText($('v-wood'), fmt(s.wood));
-    setText($('c-wood'), ' / ' + fmt(c));
-    setText($('r-wood'), s.timber > 0 ? fmtRate(g.woodRate()) : '');
-    $('m-wood').style.width = Math.min(100, s.wood / c * 100) + '%';
+  private build(): void {
+    const seen = this.game.s.seen, animate = this.built > 0;
+    for (; this.built < seen.length; this.built++) {
+      const e = seen[this.built], { kind, id } = entryKind(e);
+      if (kind === 'res') this.addCell(id as ResId, animate);
+      else if (kind === 'tab') this.addTab(id as TabId, animate);
+      else {
+        const tab = entryTab(e);
+        if (!tab) continue;
+        const node = this.makeEntry(e);
+        if (!node) continue;
+        if (animate) node.classList.add('arrive');
+        this.page(tab).list.appendChild(node);
+        this.nodes.set(e, node);
+        if (animate && tab !== this.tab) this.dots.add(tab);
+      }
+    }
+  }
 
-    $('row-money').classList.toggle('off', !s.f.sold);
-    setText($('v-money'), fmt(s.money));
-    setText($('r-money'), g.hasStall() ? (s.fruit >= c ? '果摊在卖 ' + fmtRate(this.stallRate) : '果摊等仓库满') : '');
+  private addCell(id: ResId, animate: boolean): void {
+    const cell = h('div', 'cell' + (animate ? ' arrive' : ''),
+      `<span class="nm"><i></i>${resName(id)}</span><span class="rt"></span><span class="v"><b>0</b><small></small></span><span class="meter"></span>`);
+    cell.style.setProperty('--c', `var(--r-${id})`);
+    $('res').appendChild(cell);
+    this.cells.set(id, cell);
+  }
 
-    const jc = g.jamCap();
-    $('row-jam').classList.toggle('off', !s.f.jam);
-    setText($('v-jam'), fmt(s.jam));
-    setText($('c-jam'), ' / ' + fmt(jc));
-    setText($('r-jam'), s.shops > 0 ? fmtRate(g.jamRate()) : '');
-    $('m-jam').style.width = Math.min(100, s.jam / jc * 100) + '%';
+  private addTab(id: TabId, animate: boolean): void {
+    const btn = h('button', 'tab' + (animate ? ' arrive' : ''));
+    btn.type = 'button';
+    btn.setAttribute('role', 'tab');
+    btn.textContent = TAB.get(id)!.name;
+    btn.addEventListener('click', () => this.select(id));
+    $('tabs').appendChild(btn);
+    this.tabBtns.set(id, btn);
+    this.page(id);
+    if (animate && id !== this.tab) this.dots.add(id);
+  }
 
-    // 能做的事
-    show(btn('b-plant'), s.f.tree);
-    setText($('s-plant'), fmt(treeCost(s.trees)) + ' 果子');
-    btn('b-plant').disabled = s.fruit < treeCost(s.trees);
+  private page(id: TabId): Page {
+    let p = this.pages.get(id);
+    if (p) return p;
+    const root = h('section', 'tabpage');
+    root.dataset.tab = id;
+    root.hidden = true;
+    if (id === 'crew') root.appendChild(h('p', 'crewline'));
+    const list = h('div', 'list'), foot = h('div', 'foot');
+    root.append(list, foot);
+    // 页面在 #pages 里的顺序不重要，同一时间只显示一页
+    $('pages').appendChild(root);
+    p = { root, list, foot };
+    this.pages.set(id, p);
+    return p;
+  }
 
-    show(btn('b-chop'), s.f.cap);
+  private makeEntry(e: string): HTMLElement | null {
+    const { kind, id } = entryKind(e);
+    const data = (el: HTMLElement, op: string, n?: number) => {
+      el.dataset.op = op; el.dataset.id = id;
+      if (n !== undefined) el.dataset.n = String(n);
+      return el;
+    };
+    switch (kind) {
+      case 'act': {
+        const def = ACTION.get(id)!;
+        const btn = data(h('button', 'item' + (def.main ? ' main' : ''),
+          `<span class="t">${def.name}</span>` + (def.main ? '' : '<span class="d"></span><span class="k"></span>')), 'act');
+        (btn as HTMLButtonElement).type = 'button';
+        return btn;
+      }
+      case 'b': case 'tech': {
+        const name = kind === 'b' ? BUILDING.get(id)!.name : TECH.get(id)!.name;
+        const btn = data(h('button', 'item', `<span class="t">${name}<em></em></span><span class="d"></span><span class="k"></span>`),
+          kind === 'b' ? 'build' : 'tech');
+        (btn as HTMLButtonElement).type = 'button';
+        return btn;
+      }
+      case 'job': {
+        const def = JOB.get(id)!;
+        const row = h('div', 'item', `<span class="t">${def.name}<em></em></span><span class="d">${escape(def.desc)}</span><span class="ops"></span>`);
+        const ops = row.querySelector('.ops')!;
+        for (const n of [-1, 1]) {
+          const b = data(h('button', 'mini'), 'job', n) as HTMLButtonElement;
+          b.type = 'button';
+          b.textContent = n < 0 ? '−' : '+';
+          b.setAttribute('aria-label', (n < 0 ? '少派一个' : '多派一个') + def.name);
+          ops.appendChild(b);
+        }
+        return row;
+      }
+      case 'craft': {
+        const def = CRAFT.get(id)!;
+        const recipe = costText(def.cost) + ' → 1 ' + resName(def.out);
+        const row = h('div', 'item', `<span class="t">${def.name}<em></em></span><span class="d">${escape(recipe)}</span><span class="ops"></span>`);
+        const ops = row.querySelector('.ops')!;
+        for (const n of [1, 10, 100]) {
+          const b = data(h('button', 'mini'), 'craft', n) as HTMLButtonElement;
+          b.type = 'button';
+          b.textContent = '×' + n;
+          ops.appendChild(b);
+        }
+        return row;
+      }
+      case 'shelf': {
+        const card = data(h('section', 'shelf',
+          '<h2 class="label"></h2><div class="what"><strong></strong><p></p></div><button type="button"></button>'), 'shelf');
+        card.querySelector('button')!.dataset.op = 'shelf';
+        card.querySelector('button')!.dataset.id = id;
+        delete card.dataset.op;
+        return card;
+      }
+      default: return null;
+    }
+  }
 
-    show(btn('b-timber'), s.level >= 1);
-    setText($('s-timber'), fmt(timberCost(s.timber)) + ' 果子');
-    btn('b-timber').disabled = s.fruit < timberCost(s.timber);
+  // ---- 每帧更新 ----
 
-    const e = expandCost(s.level);
-    show(btn('b-expand'), s.f.cap);
-    setText($('s-expand'), fmt(e.fruit) + ' 果子 + ' + fmt(e.wood) + ' 木头');
-    btn('b-expand').disabled = s.fruit < e.fruit || s.wood < e.wood;
-
-    show(btn('b-sell'), s.f.sell);
-    const nb = BUYERS[g.nextBuyer()];
-    setText($('s-sell'), s.lux >= 1 ? nb.name + ' · 100 个换 ' + nb.price + ' 钱' : '100 果子 换 10 钱');
-    btn('b-sell').disabled = s.fruit < 100;
-
-    show(btn('b-cook'), s.f.jam);
-    setText($('s-cook'), fmt(JAM_FRUIT) + ' 果子 + ' + fmt(JAM_WOOD) + ' 木头');
-    btn('b-cook').disabled = s.fruit < JAM_FRUIT || s.wood < JAM_WOOD || s.jam + 1 > jc;
-
-    show(btn('b-selljam'), s.f.cooked);
-    setText($('s-selljam'), nb.name + ' · 1 罐换 ' + fmt(nb.price * JAM_MULT) + ' 钱');
-    btn('b-selljam').disabled = s.jam < 1;
-
-    show(btn('b-shop'), s.f.cooked);
-    setText($('s-shop'), fmt(workshopCost(s.shops)) + ' 钱 · 每秒熬 ' + WORKSHOP_RATE + ' 罐');
-    btn('b-shop').disabled = s.money < workshopCost(s.shops);
-
-    // 货架：第一个货架先是五金店，卖完了换成科技工具
-    let any = false;
-    any = this.shelf('tech', s.tools < TOOLS.length ? 'tools' : 'tech',
-      s.tools < TOOLS.length ? '镇上五金店' : '科技工具') || any;
-    any = this.shelf('lux', 'lux', '奢侈品') || any;
-    any = this.shelf('prod', 'prod', '生产工具') || any;
-    $('shop').hidden = !any;
-
-    this.renderBuyers();
-    this.renderPlot();
+  private renderHead(): void {
+    const g = this.game, cal = $('cal');
+    if (!g.s.cal.on) { setHTML(cal, ''); return; }
+    const w = g.weatherName();
+    setHTML(cal, `第 ${g.year()} 年 · <b>${SEASONS[g.season()]}</b>` + (w ? ` · <span class="${g.weatherMult() < 1 ? 'bad' : ''}">${w}</span>` : ''));
   }
 
   private renderLog(): void {
     const g = this.game, ol = $('log');
     if (!g.newLine && ol.children.length === g.s.log.length) return;
     ol.textContent = '';
-    g.s.log.forEach((line, i) => {
-      const li = document.createElement('li');
+    g.s.log.slice(0, 4).forEach((line, i) => {
+      const li = h('li');
       li.textContent = line;
       if (i === 0 && g.newLine) li.className = 'new';
       ol.appendChild(li);
@@ -131,70 +235,171 @@ export class View {
     g.newLine = false;
   }
 
-  /** 一个货架卡片：显示货架上的下一件，没有就藏起来 */
-  private shelf(card: string, key: Shelf, label: string): boolean {
-    const g = this.game, item = g.shelfItem(key), cardEl = $('card-' + card);
-    if (!item) { show(cardEl, false); return false; }
-    const changed = !cardEl.hidden && $('n-' + card).textContent !== item.name;
-    show(cardEl, true);
-    if (changed) replay(cardEl, 'arrive');
-    setText($('l-' + card), label);
-    setText($('n-' + card), item.name);
-    setText($('d-' + card), item.desc);
-    setText($('b-' + card), fmt(item.money) + ' 钱' + (item.wood ? ' + ' + fmt(item.wood) + ' 木头' : ''));
-    btn('b-' + card).disabled = !g.canAfford(item);
-    return true;
+  private renderRes(): void {
+    const g = this.game, rates = g.rates();
+    for (const [id, cell] of this.cells) {
+      const v = g.s.res[id], c = g.cap(id), finite = Number.isFinite(c);
+      setText(cell.querySelector('b'), fmt(v));
+      setText(cell.querySelector('small'), finite ? ' / ' + fmt(c) : '');
+      let r = rates[id];
+      if (id === 'money') r = this.stallRate;
+      const rt = cell.querySelector('.rt')!;
+      setText(rt, Math.abs(r) > 1e-9 ? fmtRate(r) : '');
+      rt.classList.toggle('neg', r < -1e-9);
+      (cell.querySelector('.meter') as HTMLElement).style.width = finite && c > 0 ? Math.min(100, v / c * 100) + '%' : '0';
+    }
   }
 
-  private renderBuyers(): void {
-    const g = this.game, s = g.s, box = $('buyers'), list = $('buyer-list');
-    show(box, s.lux >= 1);
-    if (s.lux < 1) { if (list.children.length) list.textContent = ''; return; }
+  private renderEntry(e: string): void {
+    const node = this.nodes.get(e);
+    if (!node) return;
+    const g = this.game, { kind, id } = entryKind(e);
+    switch (kind) {
+      case 'act': {
+        const def = ACTION.get(id)!;
+        if (def.main) return;
+        setText(node.querySelector('.d'), def.desc(g));
+        setHTML(node.querySelector('.k'), def.cost ? costLines(g, def.cost(g)) : '');
+        (node as HTMLButtonElement).disabled = !def.can(g);
+        return;
+      }
+      case 'b': {
+        const def = BUILDING.get(id)!, cost = g.costOf(id);
+        setText(node.querySelector('em'), String(g.count(id)));
+        setText(node.querySelector('.d'), def.desc);
+        setHTML(node.querySelector('.k'), costLines(g, cost));
+        (node as HTMLButtonElement).disabled = !g.canPay(cost);
+        return;
+      }
+      case 'tech': {
+        const def = TECH.get(id)!, done = g.has(id);
+        node.classList.toggle('done', done);
+        setText(node.querySelector('.d'), def.desc);
+        setHTML(node.querySelector('.k'), done ? '已研究' : costLines(g, def.cost));
+        (node as HTMLButtonElement).disabled = done || !g.canPay(def.cost);
+        return;
+      }
+      case 'job': {
+        const n = g.s.jobs[id] ?? 0;
+        setText(node.querySelector('em'), String(n));
+        const [minus, plus] = node.querySelectorAll('button');
+        minus.disabled = n <= 0;
+        plus.disabled = g.idle() <= 0;
+        return;
+      }
+      case 'craft': {
+        const def = CRAFT.get(id)!, max = g.craftable(id);
+        setText(node.querySelector('em'), fmt(g.s.res[def.out]));
+        node.querySelectorAll('button').forEach(b => { b.disabled = max < 1; });
+        return;
+      }
+      case 'shelf': {
+        const shelf = SHELF.get(id)!, item = g.shelfItem(id), done = g.shelfDone(id);
+        const btn = node.querySelector('button')!;
+        node.classList.toggle('empty', !item);
+        const next = shelf.items[g.s.shelves[id]];
+        setText(node.querySelector('.label'), (item?.label ?? next?.label ?? shelf.items[shelf.items.length - 1].label ?? shelf.label));
+        if (item) {
+          setText(node.querySelector('strong'), item.name);
+          setText(node.querySelector('p'), item.desc);
+          setText(btn, costText(item.cost));
+          btn.disabled = !g.canPay(item.cost);
+          btn.hidden = false;
+        } else {
+          setText(node.querySelector('strong'), done ? '都买齐了' : '暂时没有新货');
+          setText(node.querySelector('p'), '');
+          btn.hidden = true;
+        }
+        return;
+      }
+    }
+  }
+
+  private renderFoot(tab: TabId, foot: HTMLElement): void {
+    const g = this.game, s = g.s;
+    if (tab === 'crew') {
+      setHTML(this.pages.get('crew')!.root.querySelector('.crewline'),
+        `帮工 <b>${s.workers}</b> / ${g.housing()} 个床位 · 闲着 <b>${g.idle()}</b>`);
+    }
+    if (tab === 'farm') this.renderPlot(foot);
+    if (tab === 'market') this.renderBuyers(foot);
+    if (tab === 'home') {
+      const own = SHELF.get('lux')!.items.slice(0, s.shelves.lux).map(i => i.own).filter(Boolean);
+      let p = foot.querySelector('p');
+      if (!p) { p = h('p', 'note'); foot.appendChild(p); }
+      setText(p, `面子 ${g.face()}` + (own.length ? ' · ' + own.join(' · ') : ''));
+    }
+  }
+
+  private renderPlot(foot: HTMLElement): void {
+    const g = this.game;
+    let trees = foot.querySelector('.trees') as HTMLElement | null, note = foot.querySelector('.note');
+    if (!trees) {
+      trees = h('div', 'trees');
+      note = h('p', 'note');
+      foot.append(trees, note);
+    }
+    const want = PLOT.map(id => Math.min(PLOT_MAX, g.count(id)));
+    const have = PLOT.map(id => trees!.querySelectorAll('.' + id).length);
+    if (have.some((n, i) => n > want[i])) { trees.textContent = ''; have.fill(0); }
+    const burst = want.reduce((a, n, i) => a + n - have[i], 0) <= 3;
+    PLOT.forEach((id, i) => {
+      // 同一种东西挨在一起：插到下一种的第一个前面
+      const before = PLOT.slice(i + 1).map(x => trees!.querySelector('.' + x)).find(Boolean) ?? null;
+      for (let n = have[i]; n < want[i]; n++) trees!.insertBefore(h('i', id + (burst ? ' new' : '')), before);
+    });
+    const parts = PLOT.filter(id => g.count(id) > 0).map(id => `${BUILDING.get(id)!.name} ${g.count(id)}`);
+    if (g.flag('stall')) parts.push('路边一个果摊');
+    setText(note, parts.join(' · '));
+  }
+
+  private renderBuyers(foot: HTMLElement): void {
+    const g = this.game, s = g.s;
+    let box = foot.querySelector('.buyers') as HTMLElement | null;
+    if (g.face() < 1) { if (box) box.hidden = true; return; }
+    if (!box) {
+      box = h('section', 'buyers', '<h2 class="label"><span>买家</span><b></b></h2><ul></ul>');
+      foot.appendChild(box);
+    }
+    box.hidden = false;
+    const list = box.querySelector('ul')!;
     const known: number[] = [];
     for (let i = BUYERS.length - 1; i >= 0; i--) if (g.knows(i)) known.push(i);
     if (list.children.length !== known.length) {
       const had = list.children.length;
       list.textContent = '';
       known.forEach((i, n) => {
-        const b = BUYERS[i], li = document.createElement('li');
+        const b = BUYERS[i], li = h('li', had && n === 0 ? 'arrive' : '',
+          '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="jam"></span><span class="left"></span></div><span class="meter"></span>');
         li.dataset.i = String(i);
-        if (had && n === 0) li.className = 'arrive';
-        li.innerHTML = '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="jam"></span><span class="left"></span></div><span class="meter"></span>';
         li.querySelector('strong')!.textContent = b.name;
         li.querySelector('p')!.textContent = b.remark;
-        li.querySelector('.price')!.textContent = '每 100 个 ' + b.price + ' 钱';
         list.appendChild(li);
       });
     }
-    const next = g.nextBuyer();
+    const next = g.nextBuyer(), pm = g.priceMult();
     for (const li of Array.from(list.children) as HTMLElement[]) {
       const i = Number(li.dataset.i), b = BUYERS[i];
       li.classList.toggle('next', i === next);
-      setText(li.querySelector('.jam')!, s.f.cooked ? '一罐果酱 ' + fmt(b.price * JAM_MULT) + ' 钱' : '');
-      setText(li.querySelector('.left')!, b.cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
+      setText(li.querySelector('.price'), `每 ${BASE_LOT} 个 ${fmt(b.price * pm)} 钱`);
+      setText(li.querySelector('.jam'), s.f.cooked ? `一罐果酱 ${fmt(b.price * pm * PRODUCTS.jam.mult)} 钱` : '');
+      setText(li.querySelector('.left'), b.cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
       (li.querySelector('.meter') as HTMLElement).style.width = b.cap ? Math.min(100, s.dem[i] / b.cap * 100) + '%' : '0';
     }
-    setText($('face'), '面子 ' + s.lux);
-  }
-
-  /** 果园：每棵树一个小图标 */
-  private renderPlot(): void {
-    const g = this.game, s = g.s, plot = $('plot'), trees = $('trees');
-    plot.hidden = s.trees + s.timber === 0;
-    let haveT = trees.querySelectorAll('.t').length, haveP = trees.querySelectorAll('.p').length;
-    if (haveT > s.trees || haveP > s.timber) { trees.textContent = ''; haveT = 0; haveP = 0; }
-    const burst = (s.trees - haveT) + (s.timber - haveP) <= 3;
-    const firstPine = trees.querySelector('.p');
-    for (; haveT < s.trees; haveT++) {
-      const a = document.createElement('i'); a.className = burst ? 't new' : 't';
-      trees.insertBefore(a, firstPine);
-    }
-    for (; haveP < s.timber; haveP++) {
-      const b = document.createElement('i'); b.className = burst ? 'p new' : 'p';
-      trees.appendChild(b);
-    }
-    setText($('plot-cap'), '果树 ' + s.trees + ' 棵' + (s.timber ? ' · 林木 ' + s.timber + ' 棵' : '') +
-      (g.hasStall() ? ' · 路边一个果摊' : '') + (s.shops ? ' · 果酱作坊 ' + s.shops + ' 间' : '') +
-      (s.lux >= 1 ? ' · ' + LUX[s.lux - 1].own : ''));
+    setText(box.querySelector('.label b'), '面子 ' + g.face());
   }
 }
+
+/** 「120 木头 + 50 钱」 */
+export function costText(cost: Amounts): string {
+  return (Object.entries(cost) as [ResId, number][]).map(([r, v]) => `${fmt(v)} ${resName(r)}`).join(' + ');
+}
+
+/** 每样一行，不够的标红 */
+function costLines(g: Game, cost: Amounts): string {
+  return (Object.entries(cost) as [ResId, number][])
+    .map(([r, v]) => `<span${g.s.res[r] < v - 1e-9 ? ' class="short"' : ''}>${fmt(v)} ${resName(r)}</span>`).join('');
+}
+
+
+

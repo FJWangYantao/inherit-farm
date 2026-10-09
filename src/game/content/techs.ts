@@ -1,0 +1,53 @@
+import type { TechDef } from '../defs';
+
+/** 熬制：买了镇上的房、木头攒到这么多才会想到 */
+export const JAM_UNLOCK_WOOD = 20000;
+
+// 页面里的顺序按出现先后，这里的顺序不影响显示。
+export const TECHS: TechDef[] = [
+  { id: 'farming', name: '农时', desc: '果农 +25%', cost: { science: 30 }, deps: [],
+    line: '记下了每样果子什么时候开花、什么时候该摘。', effects: { mult: { farmer: 0.25 } } },
+  { id: 'grafting', name: '嫁接', desc: '果树 +20%，可以种桃树', cost: { science: 60 }, deps: [],
+    line: '嫁接成活了。桃树也能种了，桃子夏天熟。', effects: { mult: { orchard: 0.2 } } },
+  { id: 'carpentry', name: '木工', desc: '木头可以做成木板', cost: { science: 80 }, deps: [],
+    line: '跟村里的木匠学会了刨木板。' },
+  { id: 'brickmaking', name: '制砖', desc: '后坡的黏土可以烧砖', cost: { science: 100 }, deps: [],
+    line: '后坡的土黏性好，能烧砖。' },
+  { id: 'forestry', name: '育林', desc: '木头产量 +50%', cost: { science: 400 }, deps: ['carpentry'],
+    line: '林木间伐，留大去小，木头长得更快。', effects: { mult: { forest: 0.5 } } },
+  { id: 'bookkeeping', name: '记账', desc: '卖东西的价钱 +10%', cost: { science: 600 }, deps: ['farming'],
+    line: '开始记账，才知道以前被压了多少价。', effects: { mult: { price: 0.1 } } },
+  { id: 'brickHouse', name: '砖瓦房', desc: '可以盖砖房，每间住 5 人', cost: { science: 500 }, deps: ['carpentry', 'brickmaking'],
+    line: '学会了砌墙上梁，能给帮工盖砖房了。' },
+  { id: 'station', name: '农技站', desc: '可以建农技站', cost: { science: 800 }, deps: ['carpentry', 'brickmaking'],
+    line: '县农业局同意在村里设个农技站。' },
+  { id: 'citrus', name: '柑橘', desc: '可以种柑橘树，冬天产得最多', cost: { science: 1200 }, deps: ['grafting'],
+    line: '从南边引来了柑橘苗，冬天也能有收成。' },
+  { id: 'irrigation', name: '灌溉', desc: '果树 +15%，不怕旱', cost: { science: 1500, money: 20000 }, deps: ['grafting'],
+    line: '挖了水渠，旱年也不怕了。', effects: { mult: { orchard: 0.15 }, flags: ['noDrought'] } },
+  { id: 'pruning', name: '整形修剪', desc: '果树 +20%', cost: { science: 3000 }, deps: ['grafting'],
+    line: '树冠修成开心形，通风透光，果子又大又甜。', effects: { mult: { orchard: 0.2 } } },
+  { id: 'sawmill', name: '锯木坊', desc: '可以建锯木坊，自动做木板', cost: { science: 2000 }, deps: ['carpentry'],
+    line: '画好了锯木坊的图纸。' },
+  { id: 'kiln', name: '砖窑', desc: '可以建砖窑，自动烧砖', cost: { science: 2000 }, deps: ['brickmaking'],
+    line: '学会了砌窑。' },
+  { id: 'compost', name: '堆肥', desc: '果农 +25%，果树 +10%', cost: { science: 4000 }, deps: ['farming', 'brickmaking'],
+    line: '落叶和果皮沤成肥，地越种越肥。', effects: { mult: { farmer: 0.25, orchard: 0.1 } } },
+  { id: 'greenhouse', name: '温室', desc: '可以建温室，四季都结果', cost: { science: 6000 }, deps: ['citrus', 'brickHouse'],
+    line: '温室的图纸画好了，木架子砖墙，顶上蒙塑料布。' },
+  { id: 'meteorology', name: '气象', desc: '坏天气的影响减半', cost: { science: 8000 }, deps: ['farming', 'irrigation'],
+    line: '装了个小气象站，看天吃饭心里有数了。', effects: { flags: ['halfBadWeather'] } },
+  { id: 'sales', name: '推销', desc: '可以派帮工当推销员，自动卖果子', cost: { science: 5000 }, deps: ['farming'],
+    show: g => g.owns('santana'),
+    line: '派人去县里跑销路，买家不用等你上门了。' },
+  { id: 'jam', name: '熬制', desc: '果子加木头熬成果酱，价钱是果子的 3 倍', cost: { science: 3000 }, deps: [],
+    show: g => g.owns('townHouse') && g.s.res.wood >= JAM_UNLOCK_WOOD,
+    intro: '柴房堆满了木头。收拾爷爷的老屋时，翻出奶奶留下的果酱方子，要用柴火慢慢熬。',
+    line: '照着奶奶的方子试了几回，火候掌握住了。' },
+  { id: 'catalog', name: '藏书', desc: '农技上限 +50%', cost: { science: 10000 }, deps: ['station'],
+    line: '书屋里的书分门别类排好了，找资料快多了。', effects: { capMult: { science: 0.5 } } },
+  { id: 'coldChain', name: '冷链', desc: '可以建冷库，多放果酱', cost: { science: 15000, money: 3000000 }, deps: ['jam'],
+    line: '学会了冷库的门道，果酱能放得更久。' },
+  { id: 'mechanization', name: '机械化', desc: '锯木坊、砖窑、果酱作坊效率翻倍', cost: { science: 20000, money: 30000000 },
+    deps: ['sawmill', 'kiln'], line: '电机代替了人力，作坊的产量翻了一番。', effects: { mult: { mill: 1 } } }
+];
