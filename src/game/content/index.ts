@@ -56,7 +56,7 @@ export function entryTab(entry: string): TabId | undefined {
     case 'act': return ACTION.get(id)?.tab;
     case 'b': return BUILDING.get(id)?.tab;
     case 'job': return 'crew';
-    case 'craft': return 'craft';
+    case 'craft': return CRAFT.get(id)?.tab ?? 'craft';
     case 'tech': return 'study';
     case 'shelf': return SHELF.get(id)?.tab;
     default: return undefined;

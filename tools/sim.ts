@@ -14,7 +14,7 @@ import { Game } from '../src/game/game';
 import { fresh } from '../src/game/state';
 import { Bot } from './bot';
 
-const DT = 0.5;
+const DT = 1;
 const MILESTONES = [10, 25, 50, 100, 200];
 
 const args = process.argv.slice(2);

@@ -13,7 +13,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39;
   --r-fruit:#C03F3A; --r-wood:#8A693D; --r-money:#9A7714; --r-jam:#8C3561;
   --r-science:#3A6A9E; --r-clay:#A65A35; --r-plank:#B08A4E; --r-brick:#9C4A35;
-  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742;
+  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742; --r-fertilizer:#5E7A3A; --r-seedling:#3E8E5A;
   --peach:#E58C8A; --citrus:#E59A2F; --glass:#7FB3C2;
   --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
@@ -25,7 +25,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
     --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
     --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
     --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95;
     --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
     color-scheme:dark;
   }
@@ -35,7 +35,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
   --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
   --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95;
   --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
   color-scheme:dark;
 }
@@ -152,7 +152,9 @@ div.item{cursor:default}
 .buyers li.next .who strong::before{background:var(--leaf);border-color:var(--leaf)}
 .buyers .who p{margin:0;padding-left:15px;font-family:var(--display);font-size:.92rem;color:var(--dim)}
 .buyers .deal{display:flex;flex-direction:column;align-items:flex-end;font-family:var(--num);font-variant-numeric:tabular-nums;font-size:.76rem;white-space:nowrap}
-.buyers .deal .jam,.buyers .deal .left{color:var(--dim)}
+.buyers .deal .left{color:var(--dim)}
+.buyers .likes{grid-column:1 / -1;margin:0;padding-left:15px;font-size:.76rem;color:var(--dim)}
+.buyers .likes:empty{display:none}
 .buyers .meter{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--r-money)}
 .buyers li.arrive{animation:arrive .6s ease-out}
 

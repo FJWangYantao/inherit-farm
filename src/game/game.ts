@@ -2,8 +2,9 @@
 // 具体有哪些东西、数值多少在 content/ 下，这里只管怎么算。
 
 import {
-  ARRIVE_SECONDS, BASE_LOT, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_MIN, MOOD_PER_WORKER,
-  OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, SEASON_SECONDS, VARIETY_MOOD,
+  ARRIVE_SECONDS, BASE_LOT, FERT_BONUS, FERT_BONUS_RESEARCHED, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_MIN, MOOD_PER_WORKER,
+  OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, OFFLINE_STEP_SECONDS, SAT_FLOOR, SAT_FLOOR_RESEARCHED,
+  SAT_TRIGGER, SAT_TRIGGER_FACE, SEASON_SECONDS, VARIETY_MOOD,
   WEATHERS, WINTER_BAD, expandCost, warehouseCap
 } from './balance';
 import {
@@ -61,6 +62,10 @@ export class Game {
   newLine = false;
   private fx: Fx | null = null;
   private seenSet: Set<string>;
+  /** 这一秒果园施上肥了没有（仓库里化肥够用），每步重算，不存档 */
+  fertilized = false;
+  /** 一步之内不会变的值（心情、天气、上限），每步开头建、结尾丢，省得反复算 */
+  private memo: { mood?: number; weather?: number; caps: Map<ResId, number> } | null = null;
 
   constructor(state: GameState = fresh()) {
     this.s = state;
@@ -94,7 +99,13 @@ export class Game {
   }
   /** 建筑加的上限之和 */
   capOf(res: ResId): number { return this.effects().caps.get(res) ?? 0; }
-  cap(res: ResId): number { return RES.get(res)!.cap(this) * (this.effects().capMult.get(res) ?? 1); }
+  cap(res: ResId): number {
+    const hit = this.memo?.caps.get(res);
+    if (hit !== undefined) return hit;
+    const c = RES.get(res)!.cap(this) * (this.effects().capMult.get(res) ?? 1);
+    this.memo?.caps.set(res, c);
+    return c;
+  }
   flag(name: string): boolean { return this.effects().flags.has(name); }
   face(): number { return this.effects().face; }
   /** 卖一趟最多卖多少个果子（果酱按一罐 100 个算） */
@@ -102,30 +113,59 @@ export class Game {
   priceMult(): number { return this.mult('price'); }
   /** 某个产量组的总倍数 */
   mult(group: string): number { return this.effects().mult.get(group) ?? 1; }
-  knows(i: number): boolean { return this.face() >= BUYERS[i].face; }
-  /** 这个买家收这样东西，一个果子的量给多少钱（含偏爱和卖价加成） */
-  unitPrice(i: number, product: ProductId = 'fruit'): number {
+  knows(i: number): boolean {
+    const b = BUYERS[i];
+    return this.face() >= b.face && (!b.need || b.need(this));
+  }
+  /** 买家的收购量上限，0 表示不限量（村口王婶） */
+  buyerCap(i: number): number {
+    const b = BUYERS[i];
+    return b.cap * (b.scale ? b.scale(this) : 1) * this.mult('refill');
+  }
+  buyerRefill(i: number): number {
+    const b = BUYERS[i];
+    return b.refill * (b.scale ? b.scale(this) : 1) * this.mult('refill');
+  }
+  /**
+   * 销路：出了品牌以后，买家收得越满出价越低。units 是这一趟要卖的量（按果子算），
+   * 按卖到一半时剩下的收购量算价钱。
+   */
+  saturation(i: number, units = 0): number {
+    const cap = this.buyerCap(i);
+    if (!this.s.f.market || i === 0 || cap <= 0) return 1;
+    const floor = this.flag('marketResearch') ? SAT_FLOOR_RESEARCHED : SAT_FLOOR;
+    const frac = Math.min(1, Math.max(0, (this.s.dem[i] - units / 2) / cap));
+    return floor + (1 - floor) * frac;
+  }
+  /** 这个买家收这样东西，一个果子的量给多少钱（含偏爱、卖价加成和销路） */
+  unitPrice(i: number, product: ProductId = 'fruit', units = 0): number {
     const b = BUYERS[i], p = PRODUCT.get(product)!;
-    return b.price / 100 * p.mult * (b.likes?.[product] ?? 1) * this.priceMult();
+    return b.price / 100 * p.mult * (b.likes?.[product] ?? 1) * this.priceMult() * this.saturation(i, units);
   }
   /** 卖这样东西出价最高、还收得下一整份的买家；都收不下就是村口王婶 */
   nextBuyer(product: ProductId = 'fruit'): number {
     const need = product === 'fruit' ? BASE_LOT : PRODUCT.get(product)!.units;
     let best = 0;
     for (let i = 1; i < BUYERS.length; i++) {
-      if (this.knows(i) && this.s.dem[i] >= need && this.unitPrice(i, product) > this.unitPrice(best, product)) best = i;
+      if (this.knows(i) && this.s.dem[i] >= need && this.unitPrice(i, product, need) > this.unitPrice(best, product, need)) best = i;
     }
     return best;
   }
   /** 认识的买家，按卖这样东西的出价从高到低 */
   private buyersFor(product: ProductId): number[] {
-    const list: number[] = [];
-    for (let i = 1; i < BUYERS.length; i++) if (this.knows(i)) list.push(i);
-    return list.sort((a, b) => this.unitPrice(b, product) - this.unitPrice(a, product));
+    const list: { i: number; p: number }[] = [];
+    for (let i = 1; i < BUYERS.length; i++) if (this.knows(i)) list.push({ i, p: this.unitPrice(i, product, 1) });
+    return list.sort((a, b) => b.p - a.p).map(x => x.i);
   }
 
   /** 帮工心情，乘在所有岗位的产量上。人还少的时候没有心情这回事，是 1 */
   mood(): number {
+    if (this.memo?.mood !== undefined) return this.memo.mood;
+    const m = this.computeMood();
+    if (this.memo) this.memo.mood = m;
+    return m;
+  }
+  private computeMood(): number {
     const s = this.s;
     if (!s.f.mood) return 1;
     let m = 1 - MOOD_PER_WORKER * Math.max(0, s.workers - MOOD_FREE_WORKERS) + this.effects().mood;
@@ -145,6 +185,12 @@ export class Game {
     return w === -1 ? WINTER_BAD.name : WEATHERS[w]?.name ?? '';
   }
   weatherMult(): number {
+    if (this.memo?.weather !== undefined) return this.memo.weather;
+    const m = this.computeWeather();
+    if (this.memo) this.memo.weather = m;
+    return m;
+  }
+  private computeWeather(): number {
     if (!this.s.cal.on) return 1;
     const w = this.s.cal.weather;
     let m = w === -1 ? WEATHERS[2].mult : WEATHERS[w]?.mult ?? 1;
@@ -158,7 +204,8 @@ export class Game {
   }
   /** 一个建筑或一个帮工的产量倍数：加成 × 季节 × 天气（帮工还要 × 心情） */
   prodMult(def: BuildingDef | JobDef): number {
-    const m = (def.group ? this.mult(def.group) : 1) * this.seasonMult(this.seasonOf(def)) * (def.weather ? this.weatherMult() : 1);
+    let m = (def.group ? this.mult(def.group) : 1) * this.seasonMult(this.seasonOf(def)) * (def.weather ? this.weatherMult() : 1);
+    if (def.group === 'orchard' && this.fertilized) m *= 1 + (this.flag('soilTest') ? FERT_BONUS_RESEARCHED : FERT_BONUS);
     return 'tab' in def ? m : m * this.mood();
   }
   /** 太阳能烘干以后晒架不看季节 */
@@ -248,6 +295,7 @@ export class Game {
       if (j.sells) use.fruit += j.sells * n * this.mood();
     }
     use.fruit += this.s.workers * FOOD_PER_WORKER;
+    if (this.fertilized) use.fertilizer += this.fertNeed();
     return { prod, use };
   }
 
@@ -269,7 +317,8 @@ export class Game {
       if (units <= 0) break;
       if (s.dem[i] <= 0) continue;
       const q = Math.min(units, s.dem[i]);
-      s.dem[i] -= q; units -= q; got += q * this.unitPrice(i, product);
+      got += q * this.unitPrice(i, product, q);
+      s.dem[i] -= q; units -= q;
     }
     got += units * this.unitPrice(0, product);
     s.res.money += got;
@@ -321,8 +370,9 @@ export class Game {
     const s = this.s;
     if (!s.f.cap && s.level === 0 && s.res.fruit >= warehouseCap(0)) { s.f.cap = true; this.say(T.capFull); }
     if (s.f.cooked && !s.f.jamFull && s.res.jam >= this.cap('jam') - 1e-9) { s.f.jamFull = true; this.say(T.jamFull); }
-    // 心情和它的解法（食堂、生活用品）要在同一刻出现，所以放在解锁检查前面
+    // 心情、销路和它们的解法要在同一刻出现，所以放在解锁检查前面
     if (!s.f.mood && s.workers >= MOOD_FREE_WORKERS) { s.f.mood = true; this.say(T.mood); }
+    if (!s.f.market && this.has('branding') && this.saturated()) { s.f.market = true; this.say(T.market); }
     for (const u of UNLOCKS) if (!this.seenSet.has(u.id) && u.show(this)) this.markSeen(u.id, quiet ? undefined : u.intro);
     const done = s.techs.length === TECHS.length && SHELVES.every(sh => this.shelfDone(sh.id));
     if (done && !s.f.end) { s.f.end = true; this.say(T.end); }
@@ -345,6 +395,22 @@ export class Game {
     cal.weather = w;
     if (season === 3 && !this.s.f.winter) { this.s.f.winter = true; this.say(T.winter); }
     if (w !== 0) this.say(w === -1 ? WINTER_BAD.line : WEATHERS[w].line);
+  }
+
+  /** 有没有像样的买家已经收满了（销路问题出现的条件） */
+  private saturated(): boolean {
+    for (let i = 1; i < BUYERS.length; i++) {
+      const cap = this.buyerCap(i);
+      if (BUYERS[i].face >= SAT_TRIGGER_FACE && this.knows(i) && cap > 0 && this.s.dem[i] < cap * SAT_TRIGGER) return true;
+    }
+    return false;
+  }
+
+  /** 果园每秒要用多少化肥 */
+  fertNeed(): number {
+    let trees = 0;
+    for (const b of BUILDINGS) if (b.group === 'orchard') trees += this.count(b.id);
+    return trees * FERT_PER_TREE;
   }
 
   /** 帮工吃饭，果子不够吃就返回 true */
@@ -385,12 +451,22 @@ export class Game {
   }
 
   private step(dt: number): number {
+    this.memo = { caps: new Map() };
+    try { return this.stepInner(dt); } finally { this.memo = null; }
+  }
+
+  private stepInner(dt: number): number {
     const s = this.s;
     let got = 0;
     for (let i = 1; i < BUYERS.length; i++) {
-      if (this.knows(i)) s.dem[i] = Math.min(BUYERS[i].cap, s.dem[i] + BUYERS[i].refill * dt);
+      if (this.knows(i)) s.dem[i] = Math.min(this.buyerCap(i), s.dem[i] + this.buyerRefill(i) * dt);
     }
     this.advanceCalendar(dt);
+
+    // 施肥：仓库里的化肥够这一步用，果园就加成
+    const fert = this.fertNeed() * dt;
+    this.fertilized = fert > 0 && s.res.fertilizer >= fert;
+    if (this.fertilized) s.res.fertilizer -= fert;
 
     // 不消耗原料的：果树、林木、土坑、帮工
     for (const b of BUILDINGS) {
@@ -441,11 +517,11 @@ export class Game {
 
   /**
    * 推进 dt 秒，返回这段时间自动卖到的钱（果摊、冷藏车、推销员）。
-   * 超过 1 秒的部分按每秒一步来算，这样买家的收购量恢复和一口气算的结果一致。
+   * 超过 stepSeconds 的部分一步一步算，这样买家的收购量恢复、季节交替和一口气算的结果一致。
    */
-  tick(dt: number): number {
+  tick(dt: number, stepSeconds = 1): number {
     let got = 0;
-    while (dt > 1) { got += this.step(1); dt -= 1; }
+    while (dt > stepSeconds) { got += this.step(stepSeconds); dt -= stepSeconds; }
     if (dt > 0) got += this.step(dt);
     return got;
   }
@@ -459,7 +535,7 @@ export class Game {
     if (awaySeconds < OFFLINE_MIN_SECONDS) { this.tick(awaySeconds); return awaySeconds; }
     const counted = Math.min(awaySeconds, OFFLINE_MAX_SECONDS) * OFFLINE_EFFICIENCY;
     const before = { ...this.s.res }, w0 = this.s.workers;
-    this.tick(counted);
+    this.tick(counted, OFFLINE_STEP_SECONDS);
     if (awaySeconds >= OFFLINE_REPORT_SECONDS) {
       const gains: string[] = [];
       for (const def of RESOURCES) {
@@ -502,14 +578,14 @@ export class Game {
   sell(product: ProductId): number {
     const s = this.s, p = PRODUCT.get(product)!;
     if (!this.isSeen('act:' + p.action)) return 0;
-    const i = this.nextBuyer(product), b = BUYERS[i], step = product === 'fruit' ? BASE_LOT : 1;
+    const i = this.nextBuyer(product), capped = this.buyerCap(i) > 0, step = product === 'fruit' ? BASE_LOT : 1;
     let n = Math.min(this.lot() / p.units, s.res[p.res]);
-    if (b.cap) n = Math.min(n, s.dem[i] / p.units);
+    if (capped) n = Math.min(n, s.dem[i] / p.units);
     n = Math.floor((n + 1e-9) / step) * step;
     if (n < step) return 0;
     s.res[p.res] -= n;
-    s.res.money += n * p.units * this.unitPrice(i, product);
-    if (b.cap) s.dem[i] -= n * p.units;
+    s.res.money += n * p.units * this.unitPrice(i, product, n * p.units);
+    if (capped) s.dem[i] -= n * p.units;
     if (!s.f.sold) { s.f.sold = true; this.say(T.firstSale); }
     this.check();
     return n;
@@ -537,22 +613,22 @@ export class Game {
     return Math.abs(k);
   }
 
-  /** 最多能做几个 */
+  /** 最多能做几次 */
   craftable(id: string): number {
     const def = CRAFT.get(id)!;
-    let n = Math.floor(this.cap(def.out) - this.s.res[def.out] + 1e-9);
+    let n = Math.floor((this.cap(def.out) - this.s.res[def.out]) / (def.amount ?? 1) + 1e-9);
     for (const [r, v] of Object.entries(def.cost) as [ResId, number][]) n = Math.min(n, Math.floor(this.s.res[r] / v + 1e-9));
     return Math.max(0, n);
   }
 
-  /** 手动做 n 个，返回实际做了几个 */
+  /** 手动做 n 次，返回实际做了几次 */
   craft(id: string, n: number): number {
     const def = CRAFT.get(id);
     if (!def || !this.isSeen('craft:' + id)) return 0;
     const k = Math.min(n, this.craftable(id));
     if (k < 1) return 0;
     this.pay(def.cost, k);
-    this.s.res[def.out] += k;
+    this.s.res[def.out] += k * (def.amount ?? 1);
     if (!this.s.made.includes(id)) {
       this.s.made.push(id);
       if (def.first) this.say(def.first);
@@ -582,7 +658,7 @@ export class Game {
     this.changed();
     // 面子到了，新认识的买家一开始收得满
     for (let i = 1; i < BUYERS.length; i++) {
-      if (BUYERS[i].face > face0 && BUYERS[i].face <= this.face()) this.s.dem[i] = BUYERS[i].cap;
+      if (BUYERS[i].face > face0 && BUYERS[i].face <= this.face()) this.s.dem[i] = this.buyerCap(i);
     }
     this.say(item.line);
     this.check();

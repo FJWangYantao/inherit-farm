@@ -12,7 +12,9 @@ export const RESOURCES: ResDef[] = [
   { id: 'jam', name: '果酱', show: g => g.has('jam'), cap: g => g.warehouse() / 100 + g.capOf('jam') },
   { id: 'dried', name: '果干', show: g => g.has('drying'), cap: g => g.warehouse() / 50 + g.capOf('dried') },
   { id: 'juice', name: '果汁', show: g => g.has('juicing'), cap: g => g.warehouse() / 100 + g.capOf('juice') },
-  { id: 'wine', name: '果酒', show: g => g.has('brewing'), cap: g => g.capOf('wine') }
+  { id: 'wine', name: '果酒', show: g => g.has('brewing'), cap: g => g.capOf('wine') },
+  { id: 'fertilizer', name: '化肥', show: g => g.s.f.market, cap: g => g.warehouse() / 100 + g.capOf('fertilizer') },
+  { id: 'seedling', name: '良种苗木', show: g => g.s.made.includes('seedling') || g.has('nursery'), cap: g => 500 + g.capOf('seedling') }
 ];
 
 export const RES_IDS = RESOURCES.map(r => r.id);

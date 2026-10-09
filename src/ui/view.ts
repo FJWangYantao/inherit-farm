@@ -203,7 +203,7 @@ export class View {
       }
       case 'craft': {
         const def = CRAFT.get(id)!;
-        const recipe = costText(def.cost) + ' → 1 ' + resName(def.out);
+        const recipe = costText(def.cost) + ` → ${def.amount ?? 1} ` + resName(def.out);
         const row = h('div', 'item', `<span class="t">${def.name}<em></em></span><span class="d">${escape(recipe)}</span><span class="ops"></span>`);
         const ops = row.querySelector('.ops')!;
         for (const n of [1, 10, 100]) {
@@ -371,6 +371,7 @@ export class View {
     });
     const parts = PLOT.filter(id => g.count(id) > 0).map(id => `${BUILDING.get(id)!.name} ${g.count(id)}`);
     if (g.flag('stall')) parts.push('路边一个果摊');
+    if (g.fertilized) parts.push('施着肥');
     setText(note, parts.join(' · '));
   }
 
@@ -391,24 +392,26 @@ export class View {
       list.textContent = '';
       known.forEach((i, n) => {
         const b = BUYERS[i], li = h('li', had && n === 0 ? 'arrive' : '',
-          '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="jam"></span><span class="left"></span></div><span class="meter"></span>');
+          '<div class="who"><strong></strong><p></p></div><div class="deal"><span class="price"></span><span class="left"></span></div><p class="likes"></p><span class="meter"></span>');
         li.dataset.i = String(i);
         li.querySelector('strong')!.textContent = b.name;
         li.querySelector('p')!.textContent = b.remark;
         list.appendChild(li);
       });
     }
-    const next = g.nextBuyer(), pm = g.priceMult();
+    const next = g.nextBuyer();
     for (const li of Array.from(list.children) as HTMLElement[]) {
       const i = Number(li.dataset.i), b = BUYERS[i];
       li.classList.toggle('next', i === next);
-      setText(li.querySelector('.price'), `每 ${BASE_LOT} 个 ${fmt(b.price * pm)} 钱`);
+      // 价钱含卖价加成和销路（收得越满越便宜）
+      setText(li.querySelector('.price'), `每 ${BASE_LOT} 个 ${fmt(g.unitPrice(i) * BASE_LOT)} 钱`);
       // 只说做出过的东西
       const likes = PRODUCTS.filter(p => s.made.includes(p.id) && (b.likes?.[p.id] ?? 1) > 1)
         .map(p => `${resName(p.res)} ×${b.likes![p.id]}`);
-      setText(li.querySelector('.jam'), likes.length ? '偏爱 ' + likes.join(' ') : '');
-      setText(li.querySelector('.left'), b.cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
-      (li.querySelector('.meter') as HTMLElement).style.width = b.cap ? Math.min(100, s.dem[i] / b.cap * 100) + '%' : '0';
+      setText(li.querySelector('.likes'), likes.length ? '偏爱 ' + likes.join(' · ') : '');
+      const cap = g.buyerCap(i);
+      setText(li.querySelector('.left'), cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
+      (li.querySelector('.meter') as HTMLElement).style.width = cap ? Math.min(100, s.dem[i] / cap * 100) + '%' : '0';
     }
     setText(box.querySelector('.label b'), '面子 ' + g.face());
   }

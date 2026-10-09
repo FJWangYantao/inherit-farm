@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARRIVE_SECONDS, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER, OFFLINE_MAX_SECONDS,
-  ORCHARD_SEASON, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
+  ARRIVE_SECONDS, FERT_BONUS, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER,
+  OFFLINE_MAX_SECONDS, OFFLINE_STEP_SECONDS, ORCHARD_SEASON, SAT_FLOOR, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
 } from '../src/game/balance';
 import { BUILDING, SHELVES, TECHS } from '../src/game/content';
 import { BUYERS, PRODUCT } from '../src/game/content/shop';
@@ -406,5 +406,92 @@ describe('心情', () => {
     expect(new Game(g.s).mood()).toBeCloseTo(1 + 0.06 + 0.15 + 4 * VARIETY_MOOD);
     g.s.b.canteen = 100;
     expect(new Game(g.s).mood()).toBe(MOOD_MAX);
+  });
+});
+
+describe('年代三：市场', () => {
+  const online = BUYERS.findIndex(b => b.name === '网购顾客');
+  const shop = BUYERS.findIndex(b => b.name === '精品超市');
+
+  it('有了品牌、像样的买家收满了，才出现销路问题；集市商人和电商同时出现', () => {
+    const dem = BUYERS.map(() => 0);
+    const g = game({ shelves: { hardware: 5, lux: 5 }, dem, seen: ['res:science'], techs: ['branding', 'packaging', 'juicing', 'drying', 'jam'] });
+    expect(g.s.f.market).toBe(true);
+    expect(g.s.log).toContain(T.market);
+    expect(g.isSeen('craft:fertilizer') && g.isSeen('craft:seedling') && g.isSeen('tech:ecommerce') && g.isSeen('shelf:marketing')).toBe(true);
+    expect(g.entries('market')).toContain('craft:fertilizer');
+    const h = game({ shelves: { hardware: 5, lux: 5 }, dem });
+    expect(h.s.f.market).toBe(false);
+  });
+
+  it('销路：收得越满越便宜，研究市场调研以后最多降到七折', () => {
+    const dem = BUYERS.map(() => 0);
+    const g = game({ shelves: { hardware: 5, lux: 5 }, dem, f: { market: true } });
+    const cap = g.buyerCap(shop);
+    g.s.dem[shop] = cap;
+    expect(g.saturation(shop)).toBe(1);
+    g.s.dem[shop] = 0;
+    expect(g.saturation(shop)).toBe(SAT_FLOOR);
+    g.s.dem[shop] = cap / 2;
+    expect(g.saturation(shop)).toBeCloseTo((1 + SAT_FLOOR) / 2);
+    expect(g.saturation(0)).toBe(1);
+    g.s.techs.push('marketResearch');
+    const h = new Game(g.s);
+    h.s.dem[shop] = 0;
+    expect(h.saturation(shop)).toBeCloseTo(0.7);
+  });
+
+  it('网购顾客不看面子，网店开得越多收得越多，直播带货翻倍', () => {
+    const g = game({ shelves: { hardware: 5 } });
+    expect(g.knows(online)).toBe(false);
+    g.s.b.eshop = 3;
+    const h = new Game(g.s);
+    expect(h.knows(online)).toBe(true);
+    expect(h.buyerRefill(online)).toBe(3 * BUYERS[online].refill);
+    h.s.techs.push('livestream');
+    expect(new Game(h.s).buyerRefill(online)).toBe(6 * BUYERS[online].refill);
+  });
+
+  it('营销货架加所有买家的收购量', () => {
+    const g = game({ shelves: { marketing: 2 } });
+    expect(g.buyerCap(shop)).toBeCloseTo(BUYERS[shop].cap * 1.2 * 1.3);
+  });
+
+  it('商人交易一次出好几个，放在集市页', () => {
+    const g = game({ f: { market: true }, level: 5, res: { money: 5000, dried: 25 } });
+    expect(g.craftable('fertilizer')).toBe(2);
+    expect(g.craft('fertilizer', 10)).toBe(2);
+    expect(g.s.res.fertilizer).toBe(40);
+    expect(g.s.made).toContain('fertilizer');
+  });
+
+  it('仓库里有化肥就自动施肥，果园加成，化肥按树的数量消耗', () => {
+    const g = game({ b: { tree: 100, peach: 20 }, level: 6, res: { fertilizer: 10 } });
+    const base = g.flows().prod.fruit;
+    g.tick(1);
+    expect(g.fertilized).toBe(true);
+    expect(g.s.res.fertilizer).toBeCloseTo(10 - 120 * FERT_PER_TREE);
+    expect(g.flows().prod.fruit).toBeCloseTo(base * (1 + FERT_BONUS));
+    g.s.res.fertilizer = 0;
+    g.tick(1);
+    expect(g.fertilized).toBe(false);
+  });
+
+  it('良种果树要用良种苗木种', () => {
+    const g = game({ made: ['seedling'], level: 9, res: { fruit: 3e6 } });
+    expect(g.isSeen('b:elite')).toBe(true);
+    expect(g.build('elite')).toBe(false);
+    g.s.res.seedling = 1;
+    expect(g.build('elite')).toBe(true);
+  });
+
+  it('离线按 10 秒一步补算，和在线一秒一步差不多', () => {
+    const p: Patch = { b: { tree: 200, timber: 5, hut: 5 }, shelves: { hardware: 3, lux: 3 }, level: 3, res: { fruit: 500 } };
+    const a = game(p), b = game(p);
+    a.catchUp(3 * 3600);
+    b.tick(3 * 3600);
+    expect(a.s.res.money / b.s.res.money).toBeCloseTo(1, 1);
+    expect(a.s.workers).toBe(b.s.workers);
+    expect(OFFLINE_STEP_SECONDS).toBe(10);
   });
 });

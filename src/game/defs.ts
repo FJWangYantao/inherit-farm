@@ -3,7 +3,8 @@
 import type { Game } from './game';
 
 export type ResId =
-  | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam' | 'dried' | 'juice' | 'wine';
+  | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam' | 'dried' | 'juice' | 'wine'
+  | 'fertilizer' | 'seedling';
 
 /** 能卖的东西 */
 export type ProductId = 'fruit' | 'jam' | 'dried' | 'juice' | 'wine';
@@ -137,9 +138,15 @@ export interface ShelfDef {
 export interface CraftDef {
   id: string;
   name: string;
-  /** 做一个要的原料 */
+  /** 做一次要的原料 */
   cost: Amounts;
   out: ResId;
+  /** 做一次出几个，不写是 1 */
+  amount?: number;
+  /** 在哪一页，不写是工坊。集市商人的交易也是一种手工：放在集市页 */
+  tab?: TabId;
+  /** 商人说的话，交易显示在说明里 */
+  remark?: string;
   show: Show;
   intro?: string;
   /** 第一次做出来时的一句话 */
@@ -159,6 +166,10 @@ export interface Buyer {
   remark: string;
   /** 偏爱的产品：这些东西的价钱再乘以这个数 */
   likes?: Partial<Record<ProductId, number>>;
+  /** 除了面子以外还要满足的条件，比如网购顾客要先有网店 */
+  need?: Show;
+  /** 收购量和恢复速度再乘以这个数，比如网购顾客按网店的间数算 */
+  scale?: (g: Game) => number;
 }
 
 /** 能卖的东西：一份按多少个果子算、价钱是果子的几倍 */

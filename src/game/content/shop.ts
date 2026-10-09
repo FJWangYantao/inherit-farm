@@ -68,6 +68,17 @@ export const SHELVES: ShelfDef[] = [
     { id: 'gym', name: '健身房', cost: { money: 80000000 }, desc: '心情 +15%', line: '盖了间健身房，下了班也有地方去。',
       effects: { mood: 0.15 } }
   ] },
+  // 年代三：营销，加所有买家的收购量
+  { id: 'marketing', tab: 'market', label: '营销', show: g => g.s.f.market, items: [
+    { id: 'billboard', name: '路边广告牌', cost: { money: 50000000 }, desc: '所有买家的收购量 +20%',
+      line: '国道边立起了「爷爷的果园」的广告牌。', effects: { mult: { refill: 0.2 } } },
+    { id: 'tvAd', name: '电视广告', cost: { money: 300000000 }, desc: '所有买家的收购量 +30%',
+      line: '省台播了十五秒的广告，镜头里是秋天的果园。', effects: { mult: { refill: 0.3 } } },
+    { id: 'endorse', name: '明星代言', cost: { money: 1500000000 }, desc: '所有买家的收购量 +40%',
+      line: '请了明星代言，海报贴满了地铁站。', effects: { mult: { refill: 0.4 } } },
+    { id: 'show', name: '冠名综艺', cost: { money: 6000000000 }, desc: '所有买家的收购量 +50%',
+      line: '冠名了一档种田综艺，嘉宾们来果园住了一个月。', effects: { mult: { refill: 0.5 } } }
+  ] },
   // 奢侈品只加面子（规则 8），每级面子对应 BUYERS 里的一个买家
   { id: 'lux', tab: 'home', label: '奢侈品', show: g => g.owns('cart'), items: [
     { id: 'clothes', name: '一身新衣服', cost: { money: 1200 }, own: '穿着一身新衣服', effects: { face: 1 },
@@ -93,7 +104,13 @@ export const SHELVES: ShelfDef[] = [
       desc: '面子 +1。在游艇上谈生意，进口商超的人排着队来', line: '在游艇上请客。进口商超的采购总监当场签了合同。' },
     { id: 'jet', name: '湾流 G650 公务机', cost: { money: 500000000 }, own: '有一架湾流 G650 公务机', effects: { face: 1 },
       need: g => g.has('brewing'),
-      desc: '面子 +1。飞去和国际食品集团谈', line: '坐公务机飞去总部。国际食品集团的董事长亲自到机场接。' }
+      desc: '面子 +1。飞去和国际食品集团谈', line: '坐公务机飞去总部。国际食品集团的董事长亲自到机场接。' },
+    { id: 'chateau', name: '波尔多酒庄', cost: { money: 2000000000 }, own: '在波尔多有一座酒庄', effects: { face: 1 },
+      need: g => g.has('ecommerce'),
+      desc: '面子 +1。国际酒商只认有酒庄的人', line: '买下了波尔多的一座老酒庄。国际酒商说，以后是同行了。' },
+    { id: 'island', name: '私人海岛', cost: { money: 8000000000 }, own: '有一座私人海岛', effects: { face: 1 },
+      need: g => g.has('livestream'),
+      desc: '面子 +1。全球会员店的创始人想来岛上度假', line: '买下了一座小岛。全球会员店的创始人坐游艇来做客，当场签了独家供货。' }
   ] }
 ];
 
@@ -111,7 +128,14 @@ export const BUYERS: Buyer[] = [
   { name: '进口商超', face: 10, price: 220, cap: 280000, refill: 3500, remark: '游艇主人推荐的货，我们照单全收。',
     likes: { juice: 1.5, dried: 1.5 } },
   { name: '国际食品集团', face: 11, price: 290, cap: 400000, refill: 5000, remark: '坐公务机来谈的供应商，全球就你一家。',
-    likes: { wine: 1.5, jam: 1.5, juice: 1.3 } }
+    likes: { wine: 1.5, jam: 1.5, juice: 1.3 } },
+  { name: '国际酒商', face: 12, price: 380, cap: 560000, refill: 7000, remark: '有酒庄的人，酿的酒错不了。',
+    likes: { wine: 2, dried: 1.2 } },
+  { name: '全球会员店', face: 13, price: 500, cap: 800000, refill: 10000, remark: '岛主的货，我们的会员抢着要。',
+    likes: { jam: 1.3, dried: 1.3, juice: 1.3, wine: 1.3 } },
+  // 网购顾客不看面子，看网店开了几间
+  { name: '网购顾客', face: 0, price: 50, cap: 36000, refill: 600, remark: '下单、付款、等快递，全国各地都有人买。',
+    likes: { jam: 1.3, dried: 1.3, juice: 1.3 }, need: g => g.count('eshop') > 0, scale: g => g.count('eshop') * g.mult('online') }
 ];
 
 /**

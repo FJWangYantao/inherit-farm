@@ -44,6 +44,22 @@ export const MOOD_MAX = 1.5;
 /** 仓库里每有一种加工品（果酱、果干、果汁、果酒），心情加多少 */
 export const VARIETY_MOOD = 0.05;
 
+// ---- 销路 ----
+/** 买家收得越满出价越低：收购量剩多少成，价钱就在 SAT_FLOOR 到 1 之间按比例算 */
+export const SAT_FLOOR = 0.5;
+/** 研究市场调研以后的下限 */
+export const SAT_FLOOR_RESEARCHED = 0.7;
+/** 有了品牌以后，面子至少这么多的买家收购量低于这个比例，就出现销路问题 */
+export const SAT_TRIGGER = 0.1;
+export const SAT_TRIGGER_FACE = 5;
+
+// ---- 化肥 ----
+/** 仓库里有化肥时，每棵果树（含桃树、柑橘、温室、良种果树）每秒用掉多少，果园产量加多少 */
+export const FERT_PER_TREE = 0.005;
+export const FERT_BONUS = 0.3;
+/** 研究测土配方以后的加成 */
+export const FERT_BONUS_RESEARCHED = 0.5;
+
 // ---- 季节和天气 ----
 export const SEASON_SECONDS = 300;
 export const SEASONS = ['春', '夏', '秋', '冬'] as const;
@@ -75,6 +91,8 @@ export const WINTER_BAD = { name: '寒潮', line: '寒潮来了，地里冻得�
 /** 离开的时间最多算这么久，按 OFFLINE_EFFICIENCY 折算 */
 export const OFFLINE_MAX_SECONDS = 12 * 3600;
 export const OFFLINE_EFFICIENCY = 1;
+/** 离线补算每步多少秒。在线是 1 秒一步；离线放粗一些，12 小时也能很快算完，误差很小 */
+export const OFFLINE_STEP_SECONDS = 10;
 /** 离开不到这么久不算离线，照常推进 */
 export const OFFLINE_MIN_SECONDS = 5;
 /** 离开超过这么久，回来时故事栏报一句收获 */

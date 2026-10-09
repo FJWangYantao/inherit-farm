@@ -9,6 +9,7 @@
 // - 建筑：果树、林木价钱不超过仓库上限就种；其他建筑要等手里每样资源都至少是价钱的 2 倍（钱要 4 倍，给大件留着）才盖，
 //   加工建筑还要原料供得上（作坊加起来最多用掉果子产量的一半）。
 // - 每样加工品先手工做一份；木板、砖手里不到上限一半时，每秒用掉一成能做的量去做。
+// - 集市商人：化肥不够 10 分钟用就去换；果酱有 500 罐以上、苗木不够种下一棵良种果树时换苗木。
 
 import { BASE_LOT, FOOD_PER_WORKER, SEASON_SECONDS, expandCost } from '../src/game/balance';
 import { BUILDINGS, JOBS, SHELVES, TECHS } from '../src/game/content';
@@ -102,6 +103,13 @@ export class Bot {
 
     // 每样加工品先手工做一份，作坊才会出现
     for (const c of ['jam', 'dried', 'juice', 'wine']) if (g.isSeen('craft:' + c) && !s.made.includes(c)) g.craft(c, 1);
+    // 集市商人：化肥不够 10 分钟用就换；果酱有富余、苗木不够种下一棵良种果树就换
+    if (g.isSeen('craft:fertilizer') && s.res.fertilizer < g.fertNeed() * 600 && s.res.money > 1e6) {
+      g.craft('fertilizer', Math.ceil((g.fertNeed() * 600 - s.res.fertilizer) / 20));
+    }
+    if (g.isSeen('craft:seedling') && s.res.jam >= 500 && s.res.seedling < (g.costOf('elite').seedling ?? 1) * 2) {
+      g.craft('seedling', 1);
+    }
     for (const c of ['plank', 'brick'] as const) {
       if (g.isSeen('craft:' + c) && s.res[c] < g.cap(c) / 2) g.craft(c, Math.ceil(g.craftable(c) / 10));
     }
