@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARRIVE_SECONDS, FOOD_PER_WORKER, LEAVE_SECONDS, OFFLINE_MAX_SECONDS, ORCHARD_SEASON, SEASON_SECONDS, warehouseCap
+  ARRIVE_SECONDS, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER, OFFLINE_MAX_SECONDS,
+  ORCHARD_SEASON, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
 } from '../src/game/balance';
 import { BUILDING, SHELVES, TECHS } from '../src/game/content';
-import { BUYERS } from '../src/game/content/shop';
+import { BUYERS, PRODUCT } from '../src/game/content/shop';
 import { Game } from '../src/game/game';
 import { fresh, type GameState } from '../src/game/state';
 import { T } from '../src/game/text';
@@ -326,5 +327,84 @@ describe('结尾', () => {
     g.check();
     expect(g.s.f.end).toBe(false);
     expect(g.s.log).not.toContain(T.end);
+  });
+});
+
+describe('年代二：加工', () => {
+  it('手工做出第一包果干，出现晒架和卖果干', () => {
+    const g = game({ techs: ['jam', 'drying'], level: 5, res: { fruit: 1000 } });
+    expect(g.isSeen('craft:dried')).toBe(true);
+    expect(g.isSeen('b:rack')).toBe(false);
+    expect(g.craft('dried', 2)).toBe(2);
+    expect(g.s.made).toContain('dried');
+    g.check();
+    expect(g.isSeen('b:rack') && g.isSeen('act:sellDried')).toBe(true);
+    expect(g.entries('market')).toContain('act:sellDried');
+  });
+
+  it('晒架夏秋晒得快，研究太阳能烘干以后不看季节', () => {
+    const g = game({ b: { rack: 1 }, level: 5, res: { fruit: 1e5 }, cal: { on: true, t: SEASON_SECONDS * 3 + 1 } });
+    g.tick(1);
+    expect(g.s.res.dried).toBeCloseTo(0.25);
+    g.s.techs.push('solarDrying');
+    const h = new Game(g.s);
+    h.tick(1);
+    expect(h.s.res.dried).toBeCloseTo(1.25);
+  });
+
+  it('果酒要先有酒窖才放得下', () => {
+    const g = game({ techs: ['brewing'], res: { fruit: 1000, wood: 100 } });
+    expect(g.cap('wine')).toBe(0);
+    expect(g.isSeen('craft:wine')).toBe(false);
+    g.s.b.cellar = 1;
+    const h = new Game(g.s);
+    h.check();
+    expect(h.cap('wine')).toBe(200);
+    expect(h.craft('wine', 10)).toBe(5);
+  });
+
+  it('不同买家偏爱不同的东西：果汁卖给航空公司，果酒卖给米其林', () => {
+    const dem = BUYERS.map(b => b.cap);
+    const g = game({ shelves: { hardware: 5, lux: 9 }, dem });
+    const airline = BUYERS.findIndex(b => b.name === '航空公司'), michelin = BUYERS.findIndex(b => b.name === '米其林餐厅');
+    expect(g.nextBuyer('juice')).toBe(airline);
+    expect(g.nextBuyer('wine')).toBe(michelin);
+    expect(g.unitPrice(airline, 'juice')).toBeCloseTo(BUYERS[airline].price / 100 * PRODUCT.get('juice')!.mult * 2);
+  });
+
+  it('有了冷藏车，所有加工品放满了都自动卖', () => {
+    const g = game({ shelves: { hardware: 7 }, level: 3, res: { dried: 1e6, juice: 1e6 } });
+    const got = g.tick(1);
+    expect(g.s.res.dried).toBe(g.cap('dried'));
+    expect(g.s.res.juice).toBe(g.cap('juice'));
+    expect(got).toBeGreaterThan(0);
+  });
+
+  it('研究了冷链，冷藏车不用等果酱放满也会上货架', () => {
+    const g = game({ f: { sold: true }, shelves: { hardware: 6 }, techs: ['coldChain'] });
+    expect(g.shelfItem('hardware')!.id).toBe('coldTruck');
+  });
+});
+
+describe('心情', () => {
+  it('帮工到 20 人开始有心情，人越多心情越低，乘在岗位产量上', () => {
+    const g = game({ workers: MOOD_FREE_WORKERS - 1, jobs: { farmer: 10 } });
+    expect(g.mood()).toBe(1);
+    g.s.workers = MOOD_FREE_WORKERS + 30;
+    g.check();
+    expect(g.s.f.mood).toBe(true);
+    expect(g.s.log[0]).toBe(T.mood);
+    expect(g.isSeen('b:canteen') && g.isSeen('shelf:comfort')).toBe(true);
+    expect(g.mood()).toBeCloseTo(1 - 30 * MOOD_PER_WORKER);
+    expect(g.flows().prod.fruit).toBeCloseTo(10 * 3 * g.mood());
+  });
+
+  it('食堂、生活用品、仓库里的加工品都加心情；营养搭配让加工品的加成翻倍；有上限', () => {
+    const g = game({ workers: MOOD_FREE_WORKERS, f: { mood: true }, b: { canteen: 2 }, shelves: { comfort: 2 }, res: { jam: 5, dried: 1 } });
+    expect(g.mood()).toBeCloseTo(1 + 0.06 + 0.15 + 2 * VARIETY_MOOD);
+    g.s.techs.push('nutrition');
+    expect(new Game(g.s).mood()).toBeCloseTo(1 + 0.06 + 0.15 + 4 * VARIETY_MOOD);
+    g.s.b.canteen = 100;
+    expect(new Game(g.s).mood()).toBe(MOOD_MAX);
   });
 });

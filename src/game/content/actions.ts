@@ -1,8 +1,8 @@
 import { BASE_LOT, SELL_UNLOCK_TREES, expandCost } from '../balance';
-import type { Amounts, Show, TabId } from '../defs';
+import type { Amounts, ProductId, Show, TabId } from '../defs';
 import { fmt } from '../format';
 import type { Game } from '../game';
-import { BUYERS, PRODUCTS } from './shop';
+import { BUYERS, PRODUCT } from './shop';
 
 /** 手动操作的按钮：摘果、砍柴、卖果…… */
 export interface ActionDef {
@@ -21,12 +21,21 @@ export interface ActionDef {
   run: (g: Game) => unknown;
 }
 
-function sellDesc(g: Game, product: 'fruit' | 'jam'): string {
-  const b = BUYERS[g.nextBuyer()], p = PRODUCTS[product];
-  const price = b.price * p.mult * g.priceMult();
+function sellDesc(g: Game, product: ProductId): string {
+  const i = g.nextBuyer(product), p = PRODUCT.get(product)!;
+  const price = g.unitPrice(i, product) * p.units;
   return product === 'fruit'
-    ? `${b.name} · 100 个换 ${fmt(price)} 钱`
-    : `${b.name} · 1 罐换 ${fmt(price * p.units / 100)} 钱`;
+    ? `${BUYERS[i].name} · 100 个换 ${fmt(price * 100)} 钱`
+    : `${BUYERS[i].name} · 1 ${p.unit}换 ${fmt(price)} 钱`;
+}
+
+/** 卖加工品的按钮，做出第一份以后出现在集市 */
+function sellAction(product: ProductId, name: string): ActionDef {
+  const p = PRODUCT.get(product)!;
+  return {
+    id: p.action, name, tab: 'market', show: g => g.s.made.includes(product),
+    desc: g => sellDesc(g, product), can: g => g.s.res[p.res] >= 1, run: g => g.sell(product)
+  };
 }
 
 export const ACTIONS: ActionDef[] = [
@@ -47,5 +56,8 @@ export const ACTIONS: ActionDef[] = [
   { id: 'sellJam', name: '卖果酱', tab: 'farm', show: g => g.s.f.cooked,
     desc: g => sellDesc(g, 'jam'), can: g => g.s.res.jam >= 1, run: g => g.sell('jam') },
   { id: 'read', name: '看书', tab: 'study', show: g => g.isSeen('b:library'),
-    desc: () => '+1 农技', can: g => g.s.res.science < g.cap('science'), run: g => g.gather('science') }
+    desc: () => '+1 农技', can: g => g.s.res.science < g.cap('science'), run: g => g.gather('science') },
+  sellAction('dried', '卖果干'),
+  sellAction('juice', '卖果汁'),
+  sellAction('wine', '卖果酒')
 ];

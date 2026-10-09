@@ -1,7 +1,7 @@
 // 存档读写。存档带版本号，旧版本的存档读进来时转换成现在的格式。
 
 import { BUYERS } from './content/shop';
-import { TECH } from './content';
+import { CRAFT, TECH } from './content';
 import { fresh, type GameState } from './state';
 import { OLD_END_LINES } from './text';
 
@@ -81,6 +81,9 @@ export function normalize(d: Record<string, unknown>): GameState {
   const cal = isObject(d.cal) ? d.cal : {};
   out.cal = { on: cal.on === true, t: num(cal.t), weather: Number.isInteger(cal.weather) ? cal.weather as number : 0, rng: num(cal.rng, base.cal.rng) };
   out.techs = Array.isArray(d.techs) ? d.techs.filter((t): t is string => typeof t === 'string' && TECH.has(t)) : [];
+  out.made = Array.isArray(d.made) ? d.made.filter((t): t is string => typeof t === 'string' && CRAFT.has(t)) : [];
+  // 版本 2 早期的存档没有 made，熬过果酱的补上
+  if (out.f.cooked && !out.made.includes('jam')) out.made.push('jam');
   const dem = Array.isArray(d.dem) ? d.dem : [];
   out.dem = BUYERS.map((_, i) => num(dem[i]));
   out.seen = Array.isArray(d.seen) ? [...new Set([...base.seen, ...d.seen.map(String)])] : base.seen;

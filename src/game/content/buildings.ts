@@ -21,6 +21,9 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'clayPit', name: '土坑', tab: 'farm', desc: '每个每秒 +0.3 黏土',
     cost: { wood: 150 }, ratio: 1.2, prod: { clay: 0.3 }, group: 'clay',
     show: g => g.has('brickmaking'), first: '在后坡挖了个土坑，黏土慢慢渗出来。' },
+  { id: 'forestFarm', name: '林场', tab: 'farm', desc: '每座每秒 +8 木头',
+    cost: { plank: 300, money: 300000 }, ratio: 1.3, prod: { wood: 8 }, group: 'forest',
+    show: g => g.has('plantation'), first: '承包了后山的荒坡，种上了速生林。' },
   { id: 'greenhouse', name: '温室', tab: 'farm', desc: '每间每秒 +15 果子，四季一样',
     cost: { plank: 300, brick: 300, money: 50000 }, ratio: 1.3, prod: { fruit: 15 }, group: 'orchard',
     show: g => g.has('greenhouse'), first: '第一间温室搭好了。外面下雪，里面开花。' },
@@ -30,6 +33,9 @@ export const BUILDINGS: BuildingDef[] = [
     cost: { wood: 50, money: 30 }, ratio: 1.6, housing: 2,
     show: g => g.owns('saw'),
     intro: '村里的年轻人听说你这儿缺人手，问有没有地方住。', first: '在果园边上搭了间工棚。' },
+  { id: 'canteen', name: '食堂', tab: 'crew', desc: '每间心情 +3%',
+    cost: { brick: 100, plank: 100, money: 20000 }, ratio: 1.6, mood: 0.03,
+    show: g => g.s.f.mood, first: '食堂开张了，大锅饭比各自开伙香多了。' },
   { id: 'house', name: '砖房', tab: 'crew', desc: '每间住 5 个帮工',
     cost: { brick: 60, plank: 40 }, ratio: 1.45, housing: 5,
     show: g => g.has('brickHouse'), first: '盖起了第一间砖房，帮工们住得舒服多了。' },
@@ -42,6 +48,9 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'station', name: '农技站', tab: 'study', desc: '农技上限 +1,000，农技员 +10%',
     cost: { brick: 200, plank: 150, money: 30000 }, ratio: 1.3, caps: { science: 1000 }, boost: { study: 0.1 },
     show: g => g.has('station'), first: '农技站挂牌了，县里的专家说有空会来看看。' },
+  { id: 'lab', name: '实验田', tab: 'study', desc: '农技上限 +5,000，每块每秒 +1 农技',
+    cost: { plank: 500, brick: 500, money: 500000 }, ratio: 1.3, caps: { science: 5000 }, prod: { science: 1 }, group: 'study',
+    show: g => g.has('labField'), first: '划出一块实验田，专门试新品种、新种法。' },
 
   // ---- 工坊 ----
   { id: 'sawmill', name: '锯木坊', tab: 'craft', desc: '每秒用 25 木头做 0.5 块木板',
@@ -53,9 +62,22 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'jamShop', name: '果酱作坊', tab: 'craft', desc: '每秒用 100 果子、10 木头熬 1 罐果酱',
     cost: { money: 100000 }, ratio: 1.6, use: { fruit: 100, wood: 10 }, prod: { jam: 1 }, group: 'mill',
     show: g => g.s.f.cooked, first: '在坡下盖了间果酱作坊。仓库里的果子和柴火，作坊自己会拿去熬。' },
-  { id: 'coldStore', name: '冷库', tab: 'craft', desc: '果酱上限 +1,000',
-    cost: { brick: 500, plank: 300, money: 1000000 }, ratio: 1.4, caps: { jam: 1000 },
-    show: g => g.has('coldChain'), first: '冷库建好了，果酱能多放不少。' }
+  { id: 'coldStore', name: '冷库', tab: 'craft', desc: '果酱、果汁上限各 +1,000',
+    cost: { brick: 500, plank: 300, money: 1000000 }, ratio: 1.4, caps: { jam: 1000, juice: 1000 },
+    show: g => g.has('coldChain'), first: '冷库建好了，果酱能多放不少。' },
+  { id: 'rack', name: '晒架', tab: 'craft', desc: '每秒用 50 果子晒 1 包果干，夏秋晒得快',
+    cost: { plank: 200, money: 200000 }, ratio: 1.3, use: { fruit: 50 }, prod: { dried: 1 }, group: 'dry',
+    season: [1, 1.5, 1.5, 0.25], weather: true,
+    show: g => g.s.made.includes('dried'), first: '院子里搭起一排晒架。' },
+  { id: 'juicer', name: '榨汁坊', tab: 'craft', desc: '每秒用 100 果子榨 1 瓶果汁',
+    cost: { brick: 500, plank: 300, money: 2000000 }, ratio: 1.4, use: { fruit: 100 }, prod: { juice: 1 }, group: 'juice',
+    show: g => g.s.made.includes('juice'), first: '榨汁坊开工了，满屋子果香。' },
+  { id: 'cellar', name: '酒窖', tab: 'craft', desc: '果酒上限 +200',
+    cost: { brick: 800, money: 5000000 }, ratio: 1.35, caps: { wine: 200 },
+    show: g => g.has('brewing'), first: '在后山挖了个酒窖，冬暖夏凉。' },
+  { id: 'winery', name: '酒坊', tab: 'craft', desc: '每秒用 200 果子、20 木头酿 0.2 瓶果酒',
+    cost: { brick: 1000, plank: 800, money: 10000000 }, ratio: 1.45, use: { fruit: 200, wood: 20 }, prod: { wine: 0.2 }, group: 'winery',
+    show: g => g.s.made.includes('wine'), first: '酒坊的发酵罐一排排立起来了。' }
 ];
 
 export const JOBS: JobDef[] = [
@@ -74,5 +96,11 @@ export const JOBS: JobDef[] = [
 export const CRAFTS: CraftDef[] = [
   { id: 'plank', name: '木板', cost: { wood: 50 }, out: 'plank', show: g => g.has('carpentry') },
   { id: 'brick', name: '砖', cost: { clay: 20, wood: 10 }, out: 'brick', show: g => g.has('brickmaking') },
-  { id: 'jam', name: '果酱', cost: { fruit: 100, wood: 10 }, out: 'jam', show: g => g.has('jam') }
+  { id: 'jam', name: '果酱', cost: { fruit: 100, wood: 10 }, out: 'jam', show: g => g.has('jam') },
+  { id: 'dried', name: '果干', cost: { fruit: 50 }, out: 'dried', show: g => g.has('drying'),
+    first: '第一批果干晒好了，嚼起来甜甜的，帮工们抢着吃。' },
+  { id: 'juice', name: '果汁', cost: { fruit: 100 }, out: 'juice', show: g => g.has('juicing'),
+    first: '榨出了第一瓶果汁，装在玻璃瓶里，挺像样。' },
+  { id: 'wine', name: '果酒', cost: { fruit: 200, wood: 20 }, out: 'wine', show: g => g.has('brewing') && g.count('cellar') > 0,
+    first: '酿出第一瓶果酒，封进了酒窖。' }
 ];

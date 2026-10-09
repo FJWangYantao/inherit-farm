@@ -13,6 +13,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39;
   --r-fruit:#C03F3A; --r-wood:#8A693D; --r-money:#9A7714; --r-jam:#8C3561;
   --r-science:#3A6A9E; --r-clay:#A65A35; --r-plank:#B08A4E; --r-brick:#9C4A35;
+  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742;
   --peach:#E58C8A; --citrus:#E59A2F; --glass:#7FB3C2;
   --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
@@ -24,6 +25,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
     --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
     --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
     --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E;
     --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
     color-scheme:dark;
   }
@@ -33,6 +35,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
   --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
   --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E;
   --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
   color-scheme:dark;
 }
@@ -133,6 +136,10 @@ div.item{cursor:default}
 .note{margin:0;font-size:.82rem;color:var(--dim)}
 .crewline{margin:0;height:1.6em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.85rem;color:var(--dim);font-family:var(--num);font-variant-numeric:tabular-nums}
 .crewline b{font-weight:500;color:var(--ink)}
+.crewline b.low{color:var(--short)}
+.fold{appearance:none;font:inherit;font-size:.8rem;color:var(--dim);background:transparent;border:0;padding:0;height:1.6em;
+  text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.fold:empty{visibility:hidden}
 
 /* 买家 */
 .buyers{display:flex;flex-direction:column}

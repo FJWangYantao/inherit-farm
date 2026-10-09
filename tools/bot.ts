@@ -2,14 +2,18 @@
 //
 // 打法：
 // - 前 5 棵树之前每秒手动摘 3 下；仓库第一次满时砍柴扩建；有了书屋、黏土以后，没人干活时手动看书、挖土。
-// - 卖果：五金店前四件买齐之前，缺钱就卖；之后每秒卖掉产出的一半，但留够过冬的口粮。果酱放满了才卖。
+// - 卖果：五金店前四件买齐之前，缺钱就卖；之后每秒卖掉产出的一半，但留够过冬的口粮。
+// - 有出价比王婶高、还收得下的买家，就把加工品和仓库三成以上的果子卖给他；加工品放满了连王婶也卖。
 // - 帮工按比例分：果农 3、伐木工 2、农技员 3、挖土工 1、推销员 1（没出现的岗位不算）。
 // - 能研究的科技挑最便宜的研究；货架上的东西买得起就买。
-// - 建筑：果树、林木价钱不超过仓库上限就种；其他建筑要等手里每样资源都至少是价钱的 2 倍才盖。
-// - 熬出第一罐果酱；木板、砖手里不到上限一半时，每秒用掉一成能做的量去做。
+// - 建筑：果树、林木价钱不超过仓库上限就种；其他建筑要等手里每样资源都至少是价钱的 2 倍（钱要 4 倍，给大件留着）才盖，
+//   加工建筑还要原料供得上（作坊加起来最多用掉果子产量的一半）。
+// - 每样加工品先手工做一份；木板、砖手里不到上限一半时，每秒用掉一成能做的量去做。
 
 import { BASE_LOT, FOOD_PER_WORKER, SEASON_SECONDS, expandCost } from '../src/game/balance';
 import { BUILDINGS, JOBS, SHELVES, TECHS } from '../src/game/content';
+import { PRODUCTS } from '../src/game/content/shop';
+import type { BuildingDef, ResId } from '../src/game/defs';
 import type { Game } from '../src/game/game';
 
 const CLICKS_PER_SECOND = 3;
@@ -65,7 +69,16 @@ export class Bot {
         this.toSell -= q;
       }
     }
-    if (s.res.jam >= g.cap('jam') - 1e-9) while (g.sell('jam')) { /* 果酱放满了才卖 */ }
+    // 有出价比王婶高、还收得下的买家，就把加工品卖给他；放满了就连王婶也卖
+    for (const p of PRODUCTS) {
+      if (p.id === 'fruit') continue;
+      while (s.res[p.res] >= 1 && g.nextBuyer(p.id) !== 0 && g.sell(p.id)) { /* 卖给好买家 */ }
+      if (g.cap(p.res) > 0 && s.res[p.res] >= g.cap(p.res) - 1e-9) while (g.sell(p.id)) { /* 卖空 */ }
+    }
+    if (!early) {
+      const reserve = s.workers * FOOD_PER_WORKER * SEASON_SECONDS * 1.5;
+      while (s.res.fruit - BASE_LOT >= reserve + g.cap('fruit') * 0.3 && g.nextBuyer('fruit') !== 0 && g.sell('fruit')) { /* 同上 */ }
+    }
 
     if (early) g.buyShelf('hardware');
     for (const tech of TECHS.filter(x => g.isSeen('tech:' + x.id) && !g.has(x.id))
@@ -81,16 +94,28 @@ export class Bot {
         const cost = g.costOf(b.id);
         const ok = b.id === 'tree' || b.id === 'timber'
           ? (cost.fruit ?? 0) <= g.cap('fruit') && g.canPay(cost)
-          : g.canPay(cost, 2);
+          : g.canPay(cost, 2) && (!cost.money || g.canPay({ money: cost.money }, 4)) && this.canFeed(b);
         if (ok && g.build(b.id)) { changed = true; this.on.built?.(b.id, g.count(b.id)); }
       }
       if (g.isSeen('act:expand') && g.expand()) { changed = true; this.on.expanded?.(s.level); }
     }
 
-    if (g.isSeen('craft:jam') && !s.f.cooked) g.craft('jam', 1);
+    // 每样加工品先手工做一份，作坊才会出现
+    for (const c of ['jam', 'dried', 'juice', 'wine']) if (g.isSeen('craft:' + c) && !s.made.includes(c)) g.craft(c, 1);
     for (const c of ['plank', 'brick'] as const) {
       if (g.isSeen('craft:' + c) && s.res[c] < g.cap(c) / 2) g.craft(c, Math.ceil(g.craftable(c) / 10));
     }
+  }
+
+  /** 加工建筑：再盖一个以后原料还供得上（果子最多拿出产量的一半给作坊，其他原料不能入不敷出） */
+  private canFeed(b: BuildingDef): boolean {
+    if (!b.use) return true;
+    const { prod, use } = this.g.flows(), k = this.g.prodMult(b);
+    for (const [r, v] of Object.entries(b.use) as [ResId, number][]) {
+      const after = use[r] + v * k;
+      if (after > prod[r] * (r === 'fruit' ? 0.5 : 0.9)) return false;
+    }
+    return true;
   }
 
   private assignJobs(): void {

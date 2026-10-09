@@ -34,6 +34,16 @@ export const LEAVE_SECONDS = 10;
 /** 帮工到几个人出现书屋和看书 */
 export const STUDY_UNLOCK_WORKERS = 3;
 
+// ---- 心情 ----
+/** 帮工到这么多人开始有心情，超过的每多一个人心情少 MOOD_PER_WORKER */
+export const MOOD_FREE_WORKERS = 20;
+export const MOOD_PER_WORKER = 0.008;
+/** 心情最低最高 */
+export const MOOD_MIN = 0.3;
+export const MOOD_MAX = 1.5;
+/** 仓库里每有一种加工品（果酱、果干、果汁、果酒），心情加多少 */
+export const VARIETY_MOOD = 0.05;
+
 // ---- 季节和天气 ----
 export const SEASON_SECONDS = 300;
 export const SEASONS = ['春', '夏', '秋', '冬'] as const;

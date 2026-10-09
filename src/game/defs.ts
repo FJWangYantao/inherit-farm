@@ -3,7 +3,10 @@
 import type { Game } from './game';
 
 export type ResId =
-  | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam';
+  | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam' | 'dried' | 'juice' | 'wine';
+
+/** 能卖的东西 */
+export type ProductId = 'fruit' | 'jam' | 'dried' | 'juice' | 'wine';
 
 export type TabId = 'farm' | 'market' | 'crew' | 'study' | 'craft' | 'home';
 
@@ -28,6 +31,8 @@ export interface Effects {
   lot?: number;
   /** 面子 */
   face?: number;
+  /** 帮工心情，加在一起 */
+  mood?: number;
 }
 
 export interface ResDef {
@@ -70,6 +75,8 @@ export interface BuildingDef {
   housing?: number;
   /** 每个给某个产量组加多少，比如书屋 { study: 0.05 } 是农技员 +5%。同一组的加在一起 */
   boost?: Record<string, number>;
+  /** 每个加多少帮工心情 */
+  mood?: number;
 }
 
 export interface JobDef {
@@ -135,6 +142,8 @@ export interface CraftDef {
   out: ResId;
   show: Show;
   intro?: string;
+  /** 第一次做出来时的一句话 */
+  first?: string;
 }
 
 export interface Buyer {
@@ -148,11 +157,18 @@ export interface Buyer {
   /** 收购量每秒恢复多少个 */
   refill: number;
   remark: string;
+  /** 偏爱的产品：这些东西的价钱再乘以这个数 */
+  likes?: Partial<Record<ProductId, number>>;
 }
 
 /** 能卖的东西：一份按多少个果子算、价钱是果子的几倍 */
 export interface Product {
+  id: ProductId;
   res: ResId;
+  /** 量词：个、罐、包、瓶 */
+  unit: string;
+  /** 卖它的按钮 */
+  action: string;
   /** 一份占买家多少个果子的收购量 */
   units: number;
   /** 价钱倍数 */

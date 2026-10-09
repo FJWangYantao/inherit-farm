@@ -9,7 +9,10 @@ export const RESOURCES: ResDef[] = [
   { id: 'clay', name: '黏土', show: g => g.has('brickmaking'), cap: g => g.warehouse() / 2 },
   { id: 'plank', name: '木板', show: g => g.has('carpentry'), cap: g => g.warehouse() / 10 },
   { id: 'brick', name: '砖', show: g => g.has('brickmaking'), cap: g => g.warehouse() / 10 },
-  { id: 'jam', name: '果酱', show: g => g.has('jam'), cap: g => g.warehouse() / 100 + g.capOf('jam') }
+  { id: 'jam', name: '果酱', show: g => g.has('jam'), cap: g => g.warehouse() / 100 + g.capOf('jam') },
+  { id: 'dried', name: '果干', show: g => g.has('drying'), cap: g => g.warehouse() / 50 + g.capOf('dried') },
+  { id: 'juice', name: '果汁', show: g => g.has('juicing'), cap: g => g.warehouse() / 100 + g.capOf('juice') },
+  { id: 'wine', name: '果酒', show: g => g.has('brewing'), cap: g => g.capOf('wine') }
 ];
 
 export const RES_IDS = RESOURCES.map(r => r.id);

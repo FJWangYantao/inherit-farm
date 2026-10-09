@@ -14,6 +14,8 @@ export interface Flags {
   cooked: boolean;
   /** 果酱第一次放满，冷藏车上货架 */
   jamFull: boolean;
+  /** 帮工多到开始有心情 */
+  mood: boolean;
   /** 见过第一个冬天 */
   winter: boolean;
   /** 正在挨饿（用来只报一次「果子吃光了」） */
@@ -48,6 +50,8 @@ export interface GameState {
   shelves: Record<string, number>;
   /** 研究完的科技，按研究的先后 */
   techs: string[];
+  /** 手工做过的东西（CRAFTS 的 id），做过第一个才出现对应的作坊 */
+  made: string[];
   /** 每个买家还收多少个果子，下标对应 BUYERS */
   dem: number[];
   /** 出现过的东西，按出现的先后。页面按这个顺序排，所以新东西永远加在最后 */
@@ -79,9 +83,10 @@ export function fresh(now = Date.now(), seed = 20240601): GameState {
     level: 0,
     shelves: zeros(SHELVES.map(s => s.id)),
     techs: [],
+    made: [],
     dem: BUYERS.map(() => 0),
     seen: ['tab:farm', 'res:fruit', 'act:pick'],
-    f: { cap: false, sold: false, cooked: false, jamFull: false, winter: false, hungry: false, end: false },
+    f: { cap: false, sold: false, cooked: false, jamFull: false, mood: false, winter: false, hungry: false, end: false },
     cal: { on: false, t: 0, weather: 0, rng: seed },
     timer: { arrive: 0, leave: 0 },
     log: [T.start],

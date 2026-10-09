@@ -14,6 +14,8 @@ const SAVE_EVERY = 5;
 const FRAME_MS = 100;
 /** 上次看的是哪一页，只是方便，存不了也没关系 */
 const TAB_KEY = 'inherit-farm-tab';
+/** 农技页是不是收起了已研究的科技，同上 */
+const FOLD_KEY = 'inherit-farm-fold';
 
 function storage(): Storage | null {
   try { return window.localStorage; } catch { return null; }
@@ -36,7 +38,10 @@ try {
 
 const view = new View(game, lastTab, tab => {
   try { store?.setItem(TAB_KEY, tab); } catch { /* 记不住就算了 */ }
+}, fold => {
+  try { store?.setItem(FOLD_KEY, fold ? '1' : ''); } catch { /* 同上 */ }
 });
+try { view.foldDone = store?.getItem(FOLD_KEY) === '1'; } catch { /* 默认展开 */ }
 /** 游戏时间的倍速，只有调试面板会改 */
 let speed = 1;
 

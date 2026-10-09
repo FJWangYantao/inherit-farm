@@ -35,8 +35,9 @@ describe('存档', () => {
     const s = deserialize(JSON.stringify(v1))!;
     expect(s.res).toMatchObject({ fruit: 300, wood: 2000, money: 5000, jam: 12 });
     expect(s.b).toMatchObject({ tree: 45, timber: 6, jamShop: 2 });
-    expect(s.shelves).toEqual({ hardware: 6, prod: 2, lux: 3 });
+    expect(s.shelves).toMatchObject({ hardware: 6, prod: 2, lux: 3 });
     expect(s.techs).toEqual(['jam']);
+    expect(s.made).toEqual(['jam']);
     expect(s.dem.slice(0, 4)).toEqual([0, 100, 200, 300]);
     expect(s.dem).toHaveLength(BUYERS.length);
     expect(s.f).toMatchObject({ cap: true, sold: true, cooked: true });

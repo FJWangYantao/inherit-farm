@@ -61,7 +61,7 @@ while (t < MAX_SECONDS && !s.f.end) {
     lastHour = t;
     const r = g.rates();
     out.push(`         ── 第 ${Math.round(t / 3600)} 小时：帮工 ${s.workers}，果子 ${fmt(r.fruit)}/秒，钱 ${fmt(s.res.money)}，` +
-      `农技 ${fmt(s.res.science)}/${fmt(g.cap('science'))}，第 ${g.year()} 年，饿跑的帮工累计 ${bot.left}`);
+      `农技 ${fmt(s.res.science)}/${fmt(g.cap('science'))}，心情 ${Math.round(g.mood() * 100)}%，饿跑 ${bot.left}`);
   }
 }
 

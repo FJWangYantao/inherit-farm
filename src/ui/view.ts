@@ -52,8 +52,10 @@ export class View {
   private cells = new Map<ResId, HTMLElement>();
   private built = 0;
   private dots = new Set<TabId>();
+  /** 农技页上研究完的科技收起来了没有，玩家自己点的 */
+  foldDone = false;
 
-  constructor(private game: Game, tab: TabId, private onTab: (tab: TabId) => void) {
+  constructor(private game: Game, tab: TabId, private onTab: (tab: TabId) => void, private onFold: (fold: boolean) => void) {
     this.tab = tab;
   }
 
@@ -144,6 +146,17 @@ export class View {
     root.dataset.tab = id;
     root.hidden = true;
     if (id === 'crew') root.appendChild(h('p', 'crewline'));
+    if (id === 'study') {
+      // 收起已研究的科技：玩家自己点的，下面的按钮跟着动不算违反规则 9
+      const fold = h('button', 'fold');
+      fold.type = 'button';
+      fold.addEventListener('click', () => {
+        this.foldDone = !this.foldDone;
+        this.onFold(this.foldDone);
+        this.render();
+      });
+      root.appendChild(fold);
+    }
     const list = h('div', 'list'), foot = h('div', 'foot');
     root.append(list, foot);
     // 页面在 #pages 里的顺序不重要，同一时间只显示一页
@@ -274,6 +287,7 @@ export class View {
       case 'tech': {
         const def = TECH.get(id)!, done = g.has(id);
         node.classList.toggle('done', done);
+        node.hidden = done && this.foldDone;
         setText(node.querySelector('.d'), def.desc);
         setHTML(node.querySelector('.k'), done ? '已研究' : costLines(g, def.cost));
         (node as HTMLButtonElement).disabled = done || !g.canPay(def.cost);
@@ -318,8 +332,15 @@ export class View {
   private renderFoot(tab: TabId, foot: HTMLElement): void {
     const g = this.game, s = g.s;
     if (tab === 'crew') {
+      const mood = Math.round(g.mood() * 100);
       setHTML(this.pages.get('crew')!.root.querySelector('.crewline'),
-        `帮工 <b>${s.workers}</b> / ${g.housing()} 个床位 · 闲着 <b>${g.idle()}</b>`);
+        `帮工 <b>${s.workers}</b> / ${g.housing()} 个床位 · 闲着 <b>${g.idle()}</b>` +
+        (s.f.mood ? ` · 心情 <b class="${mood < 100 ? 'low' : ''}">${mood}%</b>` : ''));
+    }
+    if (tab === 'study') {
+      const done = s.techs.length;
+      setText(this.pages.get('study')!.root.querySelector('.fold'),
+        done ? (this.foldDone ? `展开已研究的 ${done} 项` : `收起已研究的 ${done} 项`) : '');
     }
     if (tab === 'farm') this.renderPlot(foot);
     if (tab === 'market') this.renderBuyers(foot);
@@ -382,7 +403,10 @@ export class View {
       const i = Number(li.dataset.i), b = BUYERS[i];
       li.classList.toggle('next', i === next);
       setText(li.querySelector('.price'), `每 ${BASE_LOT} 个 ${fmt(b.price * pm)} 钱`);
-      setText(li.querySelector('.jam'), s.f.cooked ? `一罐果酱 ${fmt(b.price * pm * PRODUCTS.jam.mult)} 钱` : '');
+      // 只说做出过的东西
+      const likes = PRODUCTS.filter(p => s.made.includes(p.id) && (b.likes?.[p.id] ?? 1) > 1)
+        .map(p => `${resName(p.res)} ×${b.likes![p.id]}`);
+      setText(li.querySelector('.jam'), likes.length ? '偏爱 ' + likes.join(' ') : '');
       setText(li.querySelector('.left'), b.cap ? '还收 ' + fmt(s.dem[i]) : '不限量');
       (li.querySelector('.meter') as HTMLElement).style.width = b.cap ? Math.min(100, s.dem[i] / b.cap * 100) + '%' : '0';
     }
