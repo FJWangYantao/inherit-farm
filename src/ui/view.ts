@@ -343,6 +343,12 @@ export class View {
         done ? (this.foldDone ? `展开已研究的 ${done} 项` : `收起已研究的 ${done} 项`) : '');
     }
     if (tab === 'farm') this.renderPlot(foot);
+    if (tab === 'resort') {
+      let p = foot.querySelector('p');
+      if (!p) { p = h('p', 'note'); foot.appendChild(p); }
+      setText(p, `游客 ${fmt(s.res.guest)} / 住得下 ${fmt(g.cap('guest'))} · 景点吸引 ${fmt(g.appeal())} 人` +
+        ` · 每人每秒花 ${fmtRate(g.guestSpend()).replace('/秒', '').replace('+', '')} 钱 · 每人每秒吃 0.5 个果子`);
+    }
     if (tab === 'market') this.renderBuyers(foot);
     if (tab === 'home') {
       const own = SHELF.get('lux')!.items.slice(0, s.shelves.lux).map(i => i.own).filter(Boolean);

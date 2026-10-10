@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARRIVE_SECONDS, FERT_BONUS, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER,
+  ARRIVE_SECONDS, FAMILY_MOOD_PER_WORKER, FAMILY_WORKERS, FERT_BONUS, FERT_PER_TREE, GUEST_FOOD, GUEST_SCIENCE, GUEST_SETTLE, GUEST_SPEND, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER,
   OFFLINE_MAX_SECONDS, OFFLINE_STEP_SECONDS, ORCHARD_SEASON, SAT_FLOOR, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
 } from '../src/game/balance';
 import { BUILDING, SHELVES, TECHS } from '../src/game/content';
@@ -493,5 +493,59 @@ describe('年代三：市场', () => {
     expect(a.s.res.money / b.s.res.money).toBeCloseTo(1, 1);
     expect(a.s.workers).toBe(b.s.workers);
     expect(OFFLINE_STEP_SECONDS).toBe(10);
+  });
+});
+
+describe('年代四：企业', () => {
+  it('买了电视广告，城里人开始来玩：游客、农家乐页、民宿和采摘园同时出现', () => {
+    const g = game({ shelves: { marketing: 2 } });
+    expect(g.s.f.tourism).toBe(true);
+    expect(g.s.log).toContain(T.tourism);
+    expect(g.isSeen('tab:resort') && g.isSeen('res:guest') && g.isSeen('b:homestay') && g.isSeen('b:upick')).toBe(true);
+    expect(g.entries('resort').slice(0, 2)).toEqual(['b:homestay', 'b:upick']);
+  });
+
+  it('游客朝着吸引力和住处里小的那个靠，花钱、吃果子', () => {
+    const g = game({ shelves: { marketing: 2 }, b: { homestay: 1, upick: 10 }, level: 6, res: { fruit: 1e6 } });
+    expect(g.cap('guest')).toBe(20);
+    expect(g.appeal()).toBe(150);
+    for (let i = 0; i < GUEST_SETTLE * 5; i++) g.tick(1);
+    expect(g.s.res.guest).toBeCloseTo(20, 0);
+    const m0 = g.s.res.money, f0 = g.s.res.fruit;
+    g.tick(1);
+    expect(g.s.res.money - m0).toBeCloseTo(g.s.res.guest * GUEST_SPEND, 0);
+    expect(f0 - g.s.res.fruit).toBeCloseTo(g.s.res.guest * GUEST_FOOD, 0);
+  });
+
+  it('景点有季节：采摘园冬天冷清，温泉冬天最旺', () => {
+    const g = game({ shelves: { marketing: 2 }, b: { upick: 1, hotSpring: 1 }, cal: { on: true, t: SEASON_SECONDS * 3 + 1 } });
+    expect(g.appeal()).toBeCloseTo(15 * 0.3 + 80 * 2);
+  });
+
+  it('研学旅行：游客带来农技', () => {
+    const g = game({ shelves: { marketing: 2 }, techs: ['studyTours'], res: { guest: 100, fruit: 1e6 }, b: { homestay: 5 }, level: 6 });
+    expect(g.flows().prod.science).toBeCloseTo(100 * GUEST_SCIENCE);
+  });
+
+  it('承包地交租金产果子，交不起就按比例少产', () => {
+    const g = game({ b: { lease: 2 }, level: 8, res: { money: 100 } });
+    g.tick(1);
+    // 两块每秒要 200 租金，只有 100，所以只产一半
+    expect(g.s.res.money).toBeCloseTo(0);
+    expect(g.s.res.fruit).toBeCloseTo(200);
+    expect(g.flows().use.money).toBe(200);
+  });
+
+  it('帮工到 150 人带家属：心情再扣，卫生所和小学同时出现', () => {
+    const g = game({ workers: FAMILY_WORKERS + 10 });
+    expect(g.s.f.family).toBe(true);
+    expect(g.isSeen('b:clinic') && g.isSeen('b:school')).toBe(true);
+    expect(g.mood()).toBeCloseTo(Math.max(0.3, 1 - (FAMILY_WORKERS + 10 - 20) * 0.008 - 10 * FAMILY_MOOD_PER_WORKER));
+  });
+
+  it('现代管理：所有岗位 +25%', () => {
+    const g = game({ workers: 4, jobs: { farmer: 2, woodcutter: 2 }, techs: ['modernMgmt'] });
+    expect(g.flows().prod.wood).toBeCloseTo(2 * 1.25);
+    expect(g.flows().prod.fruit).toBeCloseTo(2 * 3 * 1.25);
   });
 });

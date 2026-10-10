@@ -2,8 +2,8 @@
 // 具体有哪些东西、数值多少在 content/ 下，这里只管怎么算。
 
 import {
-  ARRIVE_SECONDS, BASE_LOT, FERT_BONUS, FERT_BONUS_RESEARCHED, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_MIN, MOOD_PER_WORKER,
-  OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, OFFLINE_STEP_SECONDS, SAT_FLOOR, SAT_FLOOR_RESEARCHED,
+  ARRIVE_SECONDS, BASE_LOT, CROWD_MOOD_MAX, FAMILY_MOOD_MAX, FAMILY_MOOD_PER_WORKER, FAMILY_WORKERS, FERT_BONUS, FERT_BONUS_RESEARCHED, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_MIN, MOOD_PER_WORKER,
+  GUEST_FOOD, GUEST_SCIENCE, GUEST_SETTLE, GUEST_SPEND, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, OFFLINE_STEP_SECONDS, SAT_FLOOR, SAT_FLOOR_RESEARCHED,
   SAT_TRIGGER, SAT_TRIGGER_FACE, SEASON_SECONDS, VARIETY_MOOD,
   WEATHERS, WINTER_BAD, expandCost, warehouseCap
 } from './balance';
@@ -168,7 +168,8 @@ export class Game {
   private computeMood(): number {
     const s = this.s;
     if (!s.f.mood) return 1;
-    let m = 1 - MOOD_PER_WORKER * Math.max(0, s.workers - MOOD_FREE_WORKERS) + this.effects().mood;
+    let m = 1 - Math.min(CROWD_MOOD_MAX, MOOD_PER_WORKER * Math.max(0, s.workers - MOOD_FREE_WORKERS)) + this.effects().mood;
+    if (s.f.family) m -= Math.min(FAMILY_MOOD_MAX, FAMILY_MOOD_PER_WORKER * Math.max(0, s.workers - FAMILY_WORKERS));
     const variety = VARIETY_MOOD * (this.flag('nutrition') ? 2 : 1);
     for (const p of PRODUCTS) if (p.id !== 'fruit' && s.res[p.res] >= 1) m += variety;
     return Math.min(MOOD_MAX, Math.max(MOOD_MIN, m));
@@ -206,7 +207,8 @@ export class Game {
   prodMult(def: BuildingDef | JobDef): number {
     let m = (def.group ? this.mult(def.group) : 1) * this.seasonMult(this.seasonOf(def)) * (def.weather ? this.weatherMult() : 1);
     if (def.group === 'orchard' && this.fertilized) m *= 1 + (this.flag('soilTest') ? FERT_BONUS_RESEARCHED : FERT_BONUS);
-    return 'tab' in def ? m : m * this.mood();
+    // 帮工还要乘心情和所有岗位的加成（现代管理）
+    return 'tab' in def ? m : m * this.mood() * this.mult('labor');
   }
   /** 太阳能烘干以后晒架不看季节 */
   private seasonOf(def: BuildingDef | JobDef): SeasonProfile | undefined {
@@ -286,6 +288,7 @@ export class Game {
       const k = n * this.prodMult(b);
       for (const [res, v] of Object.entries(b.prod ?? {}) as [ResId, number][]) prod[res] += v * k;
       for (const [res, v] of Object.entries(b.use ?? {}) as [ResId, number][]) use[res] += v * k;
+      for (const [res, v] of Object.entries(b.upkeep ?? {}) as [ResId, number][]) use[res] += v * n;
     }
     for (const j of JOBS) {
       const n = this.s.jobs[j.id] ?? 0;
@@ -294,7 +297,8 @@ export class Game {
       for (const [res, v] of Object.entries(j.prod) as [ResId, number][]) prod[res] += v * k;
       if (j.sells) use.fruit += j.sells * n * this.mood();
     }
-    use.fruit += this.s.workers * FOOD_PER_WORKER;
+    use.fruit += this.s.workers * FOOD_PER_WORKER + this.s.res.guest * GUEST_FOOD;
+    if (this.flag('studyTours')) prod.science += this.s.res.guest * GUEST_SCIENCE;
     if (this.fertilized) use.fertilizer += this.fertNeed();
     return { prod, use };
   }
@@ -373,6 +377,8 @@ export class Game {
     // 心情、销路和它们的解法要在同一刻出现，所以放在解锁检查前面
     if (!s.f.mood && s.workers >= MOOD_FREE_WORKERS) { s.f.mood = true; this.say(T.mood); }
     if (!s.f.market && this.has('branding') && this.saturated()) { s.f.market = true; this.say(T.market); }
+    if (!s.f.family && s.workers >= FAMILY_WORKERS) { s.f.family = true; this.say(T.family); }
+    if (!s.f.tourism && this.owns('tvAd')) { s.f.tourism = true; this.say(T.tourism); }
     for (const u of UNLOCKS) if (!this.seenSet.has(u.id) && u.show(this)) this.markSeen(u.id, quiet ? undefined : u.intro);
     const done = s.techs.length === TECHS.length && SHELVES.every(sh => this.shelfDone(sh.id));
     if (done && !s.f.end) { s.f.end = true; this.say(T.end); }
@@ -411,6 +417,31 @@ export class Game {
     let trees = 0;
     for (const b of BUILDINGS) if (b.group === 'orchard') trees += this.count(b.id);
     return trees * FERT_PER_TREE;
+  }
+
+  /** 景点一共能吸引多少游客（乘了季节和 tourism 加成） */
+  appeal(): number {
+    let a = 0;
+    for (const b of BUILDINGS) if (b.appeal) a += this.count(b.id) * b.appeal * this.seasonMult(b.season);
+    return a * this.mult('tourism');
+  }
+  /** 每个游客每秒花多少钱 */
+  guestSpend(): number { return GUEST_SPEND * this.mult('tourism') * this.priceMult(); }
+
+  /** 农家乐：游客朝着吸引力和住处里小的那个靠；吃果子、花钱，研学的还带来农技。返回游客花的钱 */
+  private hostGuests(dt: number): number {
+    const s = this.s;
+    if (!s.f.tourism) return 0;
+    const need = s.res.guest * GUEST_FOOD * dt;
+    const fed = s.res.fruit >= need;
+    s.res.fruit = Math.max(0, s.res.fruit - need);
+    // 果子不够吃，游客就不来了
+    const target = fed ? Math.min(this.cap('guest'), this.appeal()) : 0;
+    s.res.guest += (target - s.res.guest) * Math.min(1, dt / GUEST_SETTLE);
+    if (this.flag('studyTours')) s.res.science += s.res.guest * GUEST_SCIENCE * dt;
+    const got = s.res.guest * this.guestSpend() * dt;
+    s.res.money += got;
+    return got;
   }
 
   /** 帮工吃饭，果子不够吃就返回 true */
@@ -468,12 +499,17 @@ export class Game {
     this.fertilized = fert > 0 && s.res.fertilizer >= fert;
     if (this.fertilized) s.res.fertilizer -= fert;
 
-    // 不消耗原料的：果树、林木、土坑、帮工
+    // 不消耗原料的：果树、林木、土坑、帮工。有租金的（承包地）先交租，交不起就按比例少产
     for (const b of BUILDINGS) {
       if (b.use || !b.prod) continue;
       const n = this.count(b.id);
       if (!n) continue;
-      const k = n * this.prodMult(b) * dt;
+      let frac = 1;
+      if (b.upkeep) {
+        for (const [r, v] of Object.entries(b.upkeep) as [ResId, number][]) frac = Math.min(frac, s.res[r] / (v * n * dt));
+        for (const [r, v] of Object.entries(b.upkeep) as [ResId, number][]) s.res[r] = Math.max(0, s.res[r] - v * n * dt * frac);
+      }
+      const k = n * this.prodMult(b) * dt * frac;
       for (const [r, v] of Object.entries(b.prod) as [ResId, number][]) s.res[r] += v * k;
     }
     for (const j of JOBS) {
@@ -484,6 +520,7 @@ export class Game {
     }
 
     const hungry = this.feedWorkers(dt);
+    got += this.hostGuests(dt);
 
     // 加工：原料不够或者产品放不下，就按比例少做
     for (const b of BUILDINGS) {

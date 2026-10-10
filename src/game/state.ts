@@ -18,6 +18,10 @@ export interface Flags {
   mood: boolean;
   /** 销路饱和了：买家收得越满出价越低 */
   market: boolean;
+  /** 帮工多到带家属来了 */
+  family: boolean;
+  /** 城里人开始来果园玩 */
+  tourism: boolean;
   /** 见过第一个冬天 */
   winter: boolean;
   /** 正在挨饿（用来只报一次「果子吃光了」） */
@@ -88,7 +92,7 @@ export function fresh(now = Date.now(), seed = 20240601): GameState {
     made: [],
     dem: BUYERS.map(() => 0),
     seen: ['tab:farm', 'res:fruit', 'act:pick'],
-    f: { cap: false, sold: false, cooked: false, jamFull: false, mood: false, market: false, winter: false, hungry: false, end: false },
+    f: { cap: false, sold: false, cooked: false, jamFull: false, mood: false, market: false, family: false, tourism: false, winter: false, hungry: false, end: false },
     cal: { on: false, t: 0, weather: 0, rng: seed },
     timer: { arrive: 0, leave: 0 },
     log: [T.start],

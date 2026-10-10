@@ -18,6 +18,7 @@ import type { BuildingDef, ResId } from '../src/game/defs';
 import type { Game } from '../src/game/game';
 
 const CLICKS_PER_SECOND = 3;
+const DECIDE_SECONDS = 5;
 const SELL_SHARE = 0.5;
 const JOB_WEIGHTS: Record<string, number> = { farmer: 3, woodcutter: 2, scholar: 3, digger: 1, seller: 1 };
 
@@ -31,6 +32,7 @@ export class Bot {
   private toSell = 0;
   private lastWorkers = -1;
   private lastSeen = 0;
+  private sinceDecide = 0;
   /** 饿跑了几个帮工 */
   left = 0;
 
@@ -80,6 +82,11 @@ export class Bot {
       const reserve = s.workers * FOOD_PER_WORKER * SEASON_SECONDS * 1.5;
       while (s.res.fruit - BASE_LOT >= reserve + g.cap('fruit') * 0.3 && g.nextBuyer('fruit') !== 0 && g.sell('fruit')) { /* 同上 */ }
     }
+
+    // 买东西、分人手这些决定每 DECIDE_SECONDS 秒做一次（前期反应快一点）
+    this.sinceDecide += dt;
+    if (!early && this.sinceDecide < DECIDE_SECONDS) return;
+    this.sinceDecide = 0;
 
     if (early) g.buyShelf('hardware');
     for (const tech of TECHS.filter(x => g.isSeen('tech:' + x.id) && !g.has(x.id))

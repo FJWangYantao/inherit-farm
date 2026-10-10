@@ -4,12 +4,12 @@ import type { Game } from './game';
 
 export type ResId =
   | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam' | 'dried' | 'juice' | 'wine'
-  | 'fertilizer' | 'seedling';
+  | 'fertilizer' | 'seedling' | 'guest';
 
 /** 能卖的东西 */
 export type ProductId = 'fruit' | 'jam' | 'dried' | 'juice' | 'wine';
 
-export type TabId = 'farm' | 'market' | 'crew' | 'study' | 'craft' | 'home';
+export type TabId = 'farm' | 'market' | 'crew' | 'study' | 'craft' | 'resort' | 'home';
 
 /** 资源数量，比如 { wood: 100, money: 50 } */
 export type Amounts = Partial<Record<ResId, number>>;
@@ -78,6 +78,10 @@ export interface BuildingDef {
   boost?: Record<string, number>;
   /** 每个加多少帮工心情 */
   mood?: number;
+  /** 景点：每个能吸引多少游客（再乘季节和 tourism 加成）。游客住处用 caps: { guest } */
+  appeal?: number;
+  /** 每个每秒要交的费用（比如承包地的租金），不吃加成；交不起就按比例停产 */
+  upkeep?: Amounts;
 }
 
 export interface JobDef {

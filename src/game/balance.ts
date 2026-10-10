@@ -38,11 +38,29 @@ export const STUDY_UNLOCK_WORKERS = 3;
 /** 帮工到这么多人开始有心情，超过的每多一个人心情少 MOOD_PER_WORKER */
 export const MOOD_FREE_WORKERS = 20;
 export const MOOD_PER_WORKER = 0.008;
+/** 人多扣的心情最多扣这么多 */
+export const CROWD_MOOD_MAX = 0.8;
 /** 心情最低最高 */
 export const MOOD_MIN = 0.3;
 export const MOOD_MAX = 1.5;
 /** 仓库里每有一种加工品（果酱、果干、果汁、果酒），心情加多少 */
 export const VARIETY_MOOD = 0.05;
+
+/** 帮工到这么多人开始带家属，超过的每多一个人心情再少 FAMILY_MOOD_PER_WORKER */
+export const FAMILY_WORKERS = 150;
+export const FAMILY_MOOD_PER_WORKER = 0.006;
+/** 带家属扣的心情最多扣这么多 */
+export const FAMILY_MOOD_MAX = 0.4;
+
+// ---- 农家乐 ----
+/** 每个游客每秒花多少钱（门票、吃饭、采摘），再乘 tourism 加成 */
+export const GUEST_SPEND = 2;
+/** 每个游客每秒吃多少果子（采摘、饭庄） */
+export const GUEST_FOOD = 0.5;
+/** 游客数朝着「吸引力和住处里小的那个」靠，大约这么多秒到位 */
+export const GUEST_SETTLE = 60;
+/** 研究研学旅行以后，每个游客每秒带来多少农技 */
+export const GUEST_SCIENCE = 0.02;
 
 // ---- 销路 ----
 /** 买家收得越满出价越低：收购量剩多少成，价钱就在 SAT_FLOOR 到 1 之间按比例算 */

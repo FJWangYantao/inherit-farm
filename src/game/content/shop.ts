@@ -79,6 +79,17 @@ export const SHELVES: ShelfDef[] = [
     { id: 'show', name: '冠名综艺', cost: { money: 6000000000 }, desc: '所有买家的收购量 +50%',
       line: '冠名了一档种田综艺，嘉宾们来果园住了一个月。', effects: { mult: { refill: 0.5 } } }
   ] },
+  // 年代四：旅游设施，加游客和游客花的钱
+  { id: 'tourism', tab: 'resort', label: '旅游设施', show: g => g.s.f.tourism, items: [
+    { id: 'parking', name: '停车场', cost: { money: 200000000 }, desc: '游客多 20%，花得也多 20%',
+      line: '修了个大停车场，周末停满了外地牌照的车。', effects: { mult: { tourism: 0.2 } } },
+    { id: 'visitorCenter', name: '游客中心', cost: { money: 1000000000 }, desc: '游客多 30%，花得也多 30%',
+      line: '游客中心盖好了，有导览图、有纪念品，还有果酱试吃。', effects: { mult: { tourism: 0.3 } } },
+    { id: 'rating4A', name: '4A 景区评级', cost: { money: 5000000000 }, desc: '游客多 40%，花得也多 40%',
+      line: '评上了 4A 景区，高速路口立起了棕色的指示牌。', effects: { mult: { tourism: 0.4 } } },
+    { id: 'rating5A', name: '5A 景区评级', cost: { money: 15000000000 }, desc: '游客多 50%，花得也多 50%',
+      line: '评上了 5A 景区。爷爷要是看到，大概不会相信这是他那块地。', effects: { mult: { tourism: 0.5 } } }
+  ] },
   // 奢侈品只加面子（规则 8），每级面子对应 BUYERS 里的一个买家
   { id: 'lux', tab: 'home', label: '奢侈品', show: g => g.owns('cart'), items: [
     { id: 'clothes', name: '一身新衣服', cost: { money: 1200 }, own: '穿着一身新衣服', effects: { face: 1 },

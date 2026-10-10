@@ -13,7 +13,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39;
   --r-fruit:#C03F3A; --r-wood:#8A693D; --r-money:#9A7714; --r-jam:#8C3561;
   --r-science:#3A6A9E; --r-clay:#A65A35; --r-plank:#B08A4E; --r-brick:#9C4A35;
-  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742; --r-fertilizer:#5E7A3A; --r-seedling:#3E8E5A;
+  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742; --r-fertilizer:#5E7A3A; --r-seedling:#3E8E5A; --r-guest:#2F7F8C;
   --peach:#E58C8A; --citrus:#E59A2F; --glass:#7FB3C2;
   --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
@@ -25,7 +25,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
     --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
     --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
     --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1;
     --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
     color-scheme:dark;
   }
@@ -35,7 +35,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
   --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
   --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1;
   --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
   color-scheme:dark;
 }
@@ -79,10 +79,10 @@ body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size
 .cell.arrive{animation:arrive .6s ease-out}
 
 /* ---- 页签 ---- */
-.tabs{display:flex;gap:4px;height:38px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--ink)}
+.tabs{display:flex;gap:2px;height:38px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--ink)}
 .tabs::-webkit-scrollbar{display:none}
-.tab{appearance:none;font:inherit;font-family:var(--display);font-size:1rem;letter-spacing:.1em;color:var(--dim);
-  background:transparent;border:0;border-bottom:3px solid transparent;padding:4px 12px 0;cursor:pointer;position:relative;white-space:nowrap;flex:none}
+.tab{appearance:none;font:inherit;font-family:var(--display);font-size:1rem;letter-spacing:0;color:var(--dim);
+  background:transparent;border:0;border-bottom:3px solid transparent;padding:4px 4px 0;cursor:pointer;position:relative;white-space:nowrap;flex:1 0 auto}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
 .tab.dot::after{content:"";position:absolute;top:6px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--r-fruit)}
 .tab.arrive{animation:arrive .6s ease-out}

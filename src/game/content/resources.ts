@@ -14,6 +14,7 @@ export const RESOURCES: ResDef[] = [
   { id: 'juice', name: '果汁', show: g => g.has('juicing'), cap: g => g.warehouse() / 100 + g.capOf('juice') },
   { id: 'wine', name: '果酒', show: g => g.has('brewing'), cap: g => g.capOf('wine') },
   { id: 'fertilizer', name: '化肥', show: g => g.s.f.market, cap: g => g.warehouse() / 100 + g.capOf('fertilizer') },
+  { id: 'guest', name: '游客', show: g => g.s.f.tourism, cap: g => g.capOf('guest') },
   { id: 'seedling', name: '良种苗木', show: g => g.s.made.includes('seedling') || g.has('nursery'), cap: g => 500 + g.capOf('seedling') }
 ];
 
@@ -29,5 +30,6 @@ export const TABS: TabDef[] = [
   { id: 'crew', name: '帮工', show: g => g.isSeen('b:hut') },
   { id: 'study', name: '农技', show: g => g.isSeen('b:library') },
   { id: 'craft', name: '工坊', show: g => g.has('carpentry') || g.has('brickmaking') || g.has('jam') },
+  { id: 'resort', name: '农家乐', show: g => g.s.f.tourism },
   { id: 'home', name: '家', show: g => g.isSeen('shelf:lux') }
 ];
