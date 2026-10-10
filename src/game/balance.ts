@@ -62,6 +62,17 @@ export const GUEST_SETTLE = 60;
 /** 研究研学旅行以后，每个游客每秒带来多少农技 */
 export const GUEST_SCIENCE = 0.02;
 
+// ---- 智慧农业 ----
+/** 研究了合作社、帮工到这么多人，就管不过来了，出现智慧农业 */
+export const SMART_WORKERS = 180;
+
+// ---- 航天育种 ----
+/** 送一批种子上天：要花的东西、多久回来、带回几颗太空种子、最多同时几批在天上 */
+export const LAUNCH_COST = { money: 1000000000, seedling: 10 };
+export const LAUNCH_SECONDS = 1800;
+export const LAUNCH_YIELD = 3;
+export const LAUNCH_MAX = 3;
+
 // ---- 销路 ----
 /** 买家收得越满出价越低：收购量剩多少成，价钱就在 SAT_FLOOR 到 1 之间按比例算 */
 export const SAT_FLOOR = 0.5;

@@ -19,6 +19,7 @@ describe('存档', () => {
     const s = fresh(123);
     s.res.fruit = 42; s.b.tree = 3; s.workers = 4; s.jobs.farmer = 2; s.techs = ['grafting'];
     s.seen.push('b:tree'); s.cal = { on: true, t: 777, weather: -1, rng: 99 }; s.dem = BUYERS.map((_, i) => i);
+    s.time = 5000; s.launches = [6000, 7000];
     expect(deserialize(serialize(s))).toEqual(s);
     expect(JSON.parse(serialize(s)).v).toBe(SAVE_VERSION);
   });

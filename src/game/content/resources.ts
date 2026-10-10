@@ -14,6 +14,8 @@ export const RESOURCES: ResDef[] = [
   { id: 'juice', name: '果汁', show: g => g.has('juicing'), cap: g => g.warehouse() / 100 + g.capOf('juice') },
   { id: 'wine', name: '果酒', show: g => g.has('brewing'), cap: g => g.capOf('wine') },
   { id: 'fertilizer', name: '化肥', show: g => g.s.f.market, cap: g => g.warehouse() / 100 + g.capOf('fertilizer') },
+  { id: 'data', name: '数据', show: g => g.s.f.smart, cap: g => 2000 + g.capOf('data') },
+  { id: 'spaceSeed', name: '太空种子', show: g => g.has('spaceBreeding'), cap: g => 100 + g.capOf('spaceSeed') },
   { id: 'guest', name: '游客', show: g => g.s.f.tourism, cap: g => g.capOf('guest') },
   { id: 'seedling', name: '良种苗木', show: g => g.s.made.includes('seedling') || g.has('nursery'), cap: g => 500 + g.capOf('seedling') }
 ];

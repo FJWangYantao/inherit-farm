@@ -6,10 +6,13 @@
 // - 有出价比王婶高、还收得下的买家，就把加工品和仓库三成以上的果子卖给他；加工品放满了连王婶也卖。
 // - 帮工按比例分：果农 3、伐木工 2、农技员 3、挖土工 1、推销员 1（没出现的岗位不算）。
 // - 能研究的科技挑最便宜的研究；货架上的东西买得起就买。
-// - 建筑：果树、林木价钱不超过仓库上限就种；其他建筑要等手里每样资源都至少是价钱的 2 倍（钱要 4 倍，给大件留着）才盖，
+// - 建筑：果树、林木价钱不超过仓库上限就种；其他建筑要等手里每样资源都至少是价钱的 2 倍（果子例外：不超过
+//   仓库上限的六成就行；钱要 4 倍，
+//   而且盖完还留得下货架上最便宜那件的钱）才盖，
 //   加工建筑还要原料供得上（作坊加起来最多用掉果子产量的一半）。
 // - 每样加工品先手工做一份；木板、砖手里不到上限一半时，每秒用掉一成能做的量去做。
-// - 集市商人：化肥不够 10 分钟用就去换；果酱有 500 罐以上、苗木不够种下一棵良种果树时换苗木。
+// - 集市商人：化肥不够 10 分钟用就去换；果酱有 500 罐以上、苗木不够种下一棵良种果树（或送一批种子上天）时换苗木。
+// - 没有传感器时手动巡园记数据；手里的钱够四倍时就送种子上天。
 
 import { BASE_LOT, FOOD_PER_WORKER, SEASON_SECONDS, expandCost } from '../src/game/balance';
 import { BUILDINGS, JOBS, SHELVES, TECHS } from '../src/game/content';
@@ -47,6 +50,7 @@ export class Bot {
       if (s.level === 0 && s.f.cap && s.res.wood < expandCost(0).wood) g.gather('wood');
       if (g.isSeen('act:read') && !(s.jobs.scholar > 0)) g.gather('science');
       if (g.isSeen('act:dig') && !(s.jobs.digger > 0) && s.res.clay < 200) g.gather('clay');
+      if (g.isSeen('act:patrol') && g.count('sensor') < 3) g.gather('data');
     }
 
     const fruitRate = Math.max(0, g.rates().fruit), w0 = s.workers;
@@ -102,7 +106,7 @@ export class Bot {
         const cost = g.costOf(b.id);
         const ok = b.id === 'tree' || b.id === 'timber'
           ? (cost.fruit ?? 0) <= g.cap('fruit') && g.canPay(cost)
-          : g.canPay(cost, 2) && (!cost.money || g.canPay({ money: cost.money }, 4)) && this.canFeed(b);
+          : this.rich(cost) && this.affordMoney(cost.money ?? 0) && this.canFeed(b);
         if (ok && g.build(b.id)) { changed = true; this.on.built?.(b.id, g.count(b.id)); }
       }
       if (g.isSeen('act:expand') && g.expand()) { changed = true; this.on.expanded?.(s.level); }
@@ -114,12 +118,40 @@ export class Bot {
     if (g.isSeen('craft:fertilizer') && s.res.fertilizer < g.fertNeed() * 600 && s.res.money > 1e6) {
       g.craft('fertilizer', Math.ceil((g.fertNeed() * 600 - s.res.fertilizer) / 20));
     }
-    if (g.isSeen('craft:seedling') && s.res.jam >= 500 && s.res.seedling < (g.costOf('elite').seedling ?? 1) * 2) {
-      g.craft('seedling', 1);
-    }
+    const seedNeed = Math.max((g.costOf('elite').seedling ?? 1) * 2, g.isSeen('act:launch') ? 10 : 0);
+    if (g.isSeen('craft:seedling') && s.res.jam >= 500 && s.res.seedling < seedNeed) g.craft('seedling', 1);
+    // 航天育种：能送就送
+    if (g.canLaunch() && g.canPay({ money: 4e9 })) g.launch();
     for (const c of ['plank', 'brick'] as const) {
       if (g.isSeen('craft:' + c) && s.res[c] < g.cap(c) / 2) g.craft(c, Math.ceil(g.craftable(c) / 10));
     }
+  }
+
+  /** 手里每样资源都至少是价钱的 2 倍；果子例外：价钱不超过仓库上限的六成、手里够付就行 */
+  private rich(cost: Partial<Record<ResId, number>>): boolean {
+    const g = this.g;
+    for (const [r, v] of Object.entries(cost) as [ResId, number][]) {
+      if (r === 'money') continue;
+      if (r === 'fruit' ? v > g.cap('fruit') * 0.6 || g.s.res.fruit < v : g.s.res[r] < v * 2) return false;
+    }
+    return true;
+  }
+
+  /**
+   * 花钱盖建筑：手里的钱至少是价钱的 4 倍；如果货架上有想买的东西，盖完还得留够它的钱
+   * （价钱不到手里钱的 5% 的小东西除外）。
+   */
+  private affordMoney(cost: number): boolean {
+    const g = this.g, money = g.s.res.money;
+    if (!cost) return true;
+    if (money < cost * 4) return false;
+    if (cost <= money * 0.05) return true;
+    let target = Infinity;
+    for (const shelf of SHELVES) {
+      const item = g.isSeen('shelf:' + shelf.id) ? g.shelfItem(shelf.id) : undefined;
+      if (item?.cost.money) target = Math.min(target, item.cost.money);
+    }
+    return !Number.isFinite(target) || money - cost >= target;
   }
 
   /** 加工建筑：再盖一个以后原料还供得上（果子最多拿出产量的一半给作坊，其他原料不能入不敷出） */

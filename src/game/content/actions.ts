@@ -1,6 +1,6 @@
-import { BASE_LOT, SELL_UNLOCK_TREES, expandCost } from '../balance';
+import { BASE_LOT, LAUNCH_COST, LAUNCH_MAX, LAUNCH_SECONDS, LAUNCH_YIELD, SELL_UNLOCK_TREES, expandCost } from '../balance';
 import type { Amounts, ProductId, Show, TabId } from '../defs';
-import { fmt } from '../format';
+import { clock, fmt } from '../format';
 import type { Game } from '../game';
 import { BUYERS, PRODUCT } from './shop';
 
@@ -57,6 +57,14 @@ export const ACTIONS: ActionDef[] = [
     desc: g => sellDesc(g, 'jam'), can: g => g.s.res.jam >= 1, run: g => g.sell('jam') },
   { id: 'read', name: '看书', tab: 'study', show: g => g.isSeen('b:library'),
     desc: () => '+1 农技', can: g => g.s.res.science < g.cap('science'), run: g => g.gather('science') },
+  { id: 'patrol', name: '巡园记录', tab: 'study', show: g => g.s.f.smart,
+    desc: () => '+1 数据', can: g => g.s.res.data < g.cap('data'), run: g => g.gather('data') },
+  { id: 'launch', name: '送种子上天', tab: 'study', show: g => g.has('spaceBreeding'),
+    desc: g => {
+      const n = g.s.launches.length;
+      return n ? `天上有 ${n} 批 · 下一批 ${clock(g.nextLanding())} 后回来` : `${LAUNCH_SECONDS / 60} 分钟后带回 ${LAUNCH_YIELD} 颗太空种子，最多 ${LAUNCH_MAX} 批`;
+    },
+    cost: () => LAUNCH_COST, can: g => g.canLaunch(), run: g => g.launch() },
   sellAction('dried', '卖果干'),
   sellAction('juice', '卖果汁'),
   sellAction('wine', '卖果酒')

@@ -90,6 +90,17 @@ export const SHELVES: ShelfDef[] = [
     { id: 'rating5A', name: '5A 景区评级', cost: { money: 15000000000 }, desc: '游客多 50%，花得也多 50%',
       line: '评上了 5A 景区。爷爷要是看到，大概不会相信这是他那块地。', effects: { mult: { tourism: 0.5 } } }
   ] },
+  // 年代五：集团。最后一件「敲钟上市」是这一轮的终点
+  { id: 'group', tab: 'home', label: '集团', show: g => g.has('crossBorder'), items: [
+    { id: 'founding', name: '成立农业集团', cost: { money: 3000000000 }, desc: '卖东西的价钱 +10%',
+      line: '「爷爷的果园农业集团」挂牌成立。', effects: { mult: { price: 0.1 } } },
+    { id: 'beverage', name: '收购饮料厂', cost: { money: 8000000000 }, desc: '榨汁坊、酒坊效率 +50%',
+      line: '收购了省里的一家饮料厂，果汁有了自己的灌装线。', effects: { mult: { juice: 0.5, winery: 0.5 } } },
+    { id: 'merger', name: '海外并购', cost: { money: 25000000000 }, desc: '所有买家的收购量 +50%',
+      line: '并购了一家海外的水果分销商，货能直接进当地超市了。', effects: { mult: { refill: 0.5 } } },
+    { id: 'ipo', name: '敲钟上市', cost: { money: 50000000000 }, desc: '集团上市',
+      line: '敲钟那天，你想起毕业那年第一次走进爷爷的果园，满地都是落下的果子。' }
+  ] },
   // 奢侈品只加面子（规则 8），每级面子对应 BUYERS 里的一个买家
   { id: 'lux', tab: 'home', label: '奢侈品', show: g => g.owns('cart'), items: [
     { id: 'clothes', name: '一身新衣服', cost: { money: 1200 }, own: '穿着一身新衣服', effects: { face: 1 },
@@ -146,7 +157,10 @@ export const BUYERS: Buyer[] = [
     likes: { jam: 1.3, dried: 1.3, juice: 1.3, wine: 1.3 } },
   // 网购顾客不看面子，看网店开了几间
   { name: '网购顾客', face: 0, price: 50, cap: 36000, refill: 600, remark: '下单、付款、等快递，全国各地都有人买。',
-    likes: { jam: 1.3, dried: 1.3, juice: 1.3 }, need: g => g.count('eshop') > 0, scale: g => g.count('eshop') * g.mult('online') }
+    likes: { jam: 1.3, dried: 1.3, juice: 1.3 }, need: g => g.count('eshop') > 0, scale: g => g.count('eshop') * g.mult('online') },
+  // 海外市场不看面子，看海外仓建了几个（新买家只往最后加：存档里的收购量是按位置存的）
+  { name: '海外市场', face: 0, price: 400, cap: 60000, refill: 1000, remark: '东南亚、欧洲、中东，哪里都有人想尝尝中国的果子。',
+    likes: { jam: 1.2, dried: 1.2, juice: 1.2, wine: 1.2 }, need: g => g.count('overseas') > 0, scale: g => g.count('overseas') }
 ];
 
 /**

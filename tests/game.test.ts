@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ARRIVE_SECONDS, FAMILY_MOOD_PER_WORKER, FAMILY_WORKERS, FERT_BONUS, FERT_PER_TREE, GUEST_FOOD, GUEST_SCIENCE, GUEST_SETTLE, GUEST_SPEND, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_PER_WORKER,
-  OFFLINE_MAX_SECONDS, OFFLINE_STEP_SECONDS, ORCHARD_SEASON, SAT_FLOOR, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
+  LAUNCH_COST, LAUNCH_MAX, LAUNCH_SECONDS, LAUNCH_YIELD, OFFLINE_MAX_SECONDS, OFFLINE_STEP_SECONDS, SMART_WORKERS, ORCHARD_SEASON, SAT_FLOOR, SEASON_SECONDS, VARIETY_MOOD, warehouseCap
 } from '../src/game/balance';
 import { BUILDING, SHELVES, TECHS } from '../src/game/content';
 import { BUYERS, PRODUCT } from '../src/game/content/shop';
@@ -547,5 +547,63 @@ describe('年代四：企业', () => {
     const g = game({ workers: 4, jobs: { farmer: 2, woodcutter: 2 }, techs: ['modernMgmt'] });
     expect(g.flows().prod.wood).toBeCloseTo(2 * 1.25);
     expect(g.flows().prod.fruit).toBeCloseTo(2 * 3 * 1.25);
+  });
+});
+
+describe('年代五：现代农业', () => {
+  it('研究了合作社、帮工多到管不过来，出现智慧农业：数据、巡园记录、智慧农业科技', () => {
+    const g = game({ techs: ['cooperative', 'modernMgmt'], workers: SMART_WORKERS, seen: ['res:science'] });
+    expect(g.s.f.smart).toBe(true);
+    expect(g.s.log).toContain(T.smart);
+    expect(g.isSeen('res:data') && g.isSeen('act:patrol') && g.isSeen('tech:smartFarming')).toBe(true);
+    expect(g.gather('data')).toBe(true);
+    expect(g.s.res.data).toBe(1);
+  });
+
+  it('科技可以要数据', () => {
+    const g = game({ f: { smart: true }, techs: ['modernMgmt'], seen: ['res:science'], res: { science: 200000, data: 100 } });
+    expect(g.research('smartFarming')).toBe(false);
+    g.s.res.data = 200;
+    expect(g.research('smartFarming')).toBe(true);
+    expect(g.s.res.data).toBe(0);
+  });
+
+  it('送种子上天：要等一阵，最多同时几批，回来带太空种子，之后能种太空果树', () => {
+    const g = game({ techs: ['spaceBreeding'], seen: ['res:science'], level: 9, res: { money: 1e11, seedling: 100, fruit: 2e7 } });
+    expect(g.isSeen('act:launch')).toBe(true);
+    for (let i = 0; i < LAUNCH_MAX; i++) expect(g.launch()).toBe(true);
+    expect(g.launch()).toBe(false);
+    expect(g.s.res.money).toBe(1e11 - LAUNCH_MAX * LAUNCH_COST.money);
+    g.tick(LAUNCH_SECONDS - 10);
+    expect(g.s.res.spaceSeed).toBe(0);
+    expect(g.nextLanding()).toBeCloseTo(10);
+    g.tick(20);
+    expect(g.s.res.spaceSeed).toBe(LAUNCH_MAX * LAUNCH_YIELD);
+    expect(g.s.launches).toEqual([]);
+    expect(g.s.f.space).toBe(true);
+    expect(g.isSeen('b:spaceOrchard')).toBe(true);
+    expect(g.build('spaceOrchard')).toBe(true);
+  });
+
+  it('送上天的种子离线也会回来', () => {
+    const g = game({ techs: ['spaceBreeding'], seen: ['res:science'], res: { money: 1e10, seedling: 10 } });
+    g.launch();
+    g.catchUp(2 * 3600);
+    expect(g.s.res.spaceSeed).toBe(LAUNCH_YIELD);
+  });
+
+  it('海外市场按海外仓的数量收', () => {
+    const i = BUYERS.findIndex(b => b.name === '海外市场');
+    const g = game({ b: { overseas: 2 } });
+    expect(g.knows(i)).toBe(true);
+    expect(g.buyerRefill(i)).toBe(2 * BUYERS[i].refill);
+    expect(i).toBe(BUYERS.length - 1);
+  });
+
+  it('集团货架最后一件是敲钟上市，买完才到结尾', () => {
+    const g = game({ techs: ['crossBorder'], res: { money: 1e12 } });
+    expect(g.isSeen('shelf:group')).toBe(true);
+    while (g.buyShelf('group')) { /* 买到底 */ }
+    expect(g.owns('ipo')).toBe(true);
   });
 });

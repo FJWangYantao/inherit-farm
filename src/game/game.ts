@@ -3,7 +3,8 @@
 
 import {
   ARRIVE_SECONDS, BASE_LOT, CROWD_MOOD_MAX, FAMILY_MOOD_MAX, FAMILY_MOOD_PER_WORKER, FAMILY_WORKERS, FERT_BONUS, FERT_BONUS_RESEARCHED, FERT_PER_TREE, FOOD_PER_WORKER, LEAVE_SECONDS, MOOD_FREE_WORKERS, MOOD_MAX, MOOD_MIN, MOOD_PER_WORKER,
-  GUEST_FOOD, GUEST_SCIENCE, GUEST_SETTLE, GUEST_SPEND, OFFLINE_EFFICIENCY, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, OFFLINE_STEP_SECONDS, SAT_FLOOR, SAT_FLOOR_RESEARCHED,
+  GUEST_FOOD, GUEST_SCIENCE, GUEST_SETTLE, GUEST_SPEND, LAUNCH_COST, LAUNCH_MAX, LAUNCH_SECONDS, LAUNCH_YIELD,
+  OFFLINE_EFFICIENCY, SMART_WORKERS, OFFLINE_MAX_SECONDS, OFFLINE_MIN_SECONDS, OFFLINE_REPORT_SECONDS, OFFLINE_STEP_SECONDS, SAT_FLOOR, SAT_FLOOR_RESEARCHED,
   SAT_TRIGGER, SAT_TRIGGER_FACE, SEASON_SECONDS, VARIETY_MOOD,
   WEATHERS, WINTER_BAD, expandCost, warehouseCap
 } from './balance';
@@ -379,6 +380,7 @@ export class Game {
     if (!s.f.market && this.has('branding') && this.saturated()) { s.f.market = true; this.say(T.market); }
     if (!s.f.family && s.workers >= FAMILY_WORKERS) { s.f.family = true; this.say(T.family); }
     if (!s.f.tourism && this.owns('tvAd')) { s.f.tourism = true; this.say(T.tourism); }
+    if (!s.f.smart && this.has('cooperative') && s.workers >= SMART_WORKERS) { s.f.smart = true; this.say(T.smart); }
     for (const u of UNLOCKS) if (!this.seenSet.has(u.id) && u.show(this)) this.markSeen(u.id, quiet ? undefined : u.intro);
     const done = s.techs.length === TECHS.length && SHELVES.every(sh => this.shelfDone(sh.id));
     if (done && !s.f.end) { s.f.end = true; this.say(T.end); }
@@ -493,6 +495,8 @@ export class Game {
       if (this.knows(i)) s.dem[i] = Math.min(this.buyerCap(i), s.dem[i] + this.buyerRefill(i) * dt);
     }
     this.advanceCalendar(dt);
+    s.time += dt;
+    this.landLaunches();
 
     // 施肥：仓库里的化肥够这一步用，果园就加成
     const fert = this.fertNeed() * dt;
@@ -595,6 +599,33 @@ export class Game {
   }
 
   /** 手动 +1：砍柴、挖土、看书 */
+  // ---- 航天育种：送种子上天，等一阵带回太空种子 ----
+
+  canLaunch(): boolean {
+    return this.isSeen('act:launch') && this.s.launches.length < LAUNCH_MAX && this.canPay(LAUNCH_COST);
+  }
+  launch(): boolean {
+    if (!this.canLaunch()) return false;
+    this.pay(LAUNCH_COST);
+    this.s.launches.push(this.s.time + LAUNCH_SECONDS);
+    this.s.launches.sort((a, b) => a - b);
+    this.say(T.launch);
+    return true;
+  }
+  /** 下一批还有多少秒回来，没有在天上的是 -1 */
+  nextLanding(): number {
+    return this.s.launches.length ? Math.max(0, this.s.launches[0] - this.s.time) : -1;
+  }
+  private landLaunches(): void {
+    const s = this.s;
+    while (s.launches.length && s.launches[0] <= s.time) {
+      s.launches.shift();
+      s.res.spaceSeed = Math.min(this.cap('spaceSeed'), s.res.spaceSeed + LAUNCH_YIELD);
+      s.f.space = true;
+      this.say(T.landed(LAUNCH_YIELD));
+    }
+  }
+
   gather(res: ResId): boolean {
     if (this.s.res[res] >= this.cap(res)) return false;
     this.s.res[res] = Math.min(this.cap(res), this.s.res[res] + 1);

@@ -4,7 +4,7 @@ import type { Game } from './game';
 
 export type ResId =
   | 'fruit' | 'wood' | 'money' | 'clay' | 'science' | 'plank' | 'brick' | 'jam' | 'dried' | 'juice' | 'wine'
-  | 'fertilizer' | 'seedling' | 'guest';
+  | 'fertilizer' | 'seedling' | 'guest' | 'data' | 'spaceSeed';
 
 /** 能卖的东西 */
 export type ProductId = 'fruit' | 'jam' | 'dried' | 'juice' | 'wine';

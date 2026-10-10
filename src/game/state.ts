@@ -22,6 +22,10 @@ export interface Flags {
   family: boolean;
   /** 城里人开始来果园玩 */
   tourism: boolean;
+  /** 帮工多到管不过来，出现智慧农业 */
+  smart: boolean;
+  /** 第一批太空种子回来了 */
+  space: boolean;
   /** 见过第一个冬天 */
   winter: boolean;
   /** 正在挨饿（用来只报一次「果子吃光了」） */
@@ -66,6 +70,10 @@ export interface GameState {
   cal: Calendar;
   /** 帮工来、走的计时（秒） */
   timer: { arrive: number; leave: number };
+  /** 游戏里一共过了多少秒（含离线），给要等的事情计时 */
+  time: number;
+  /** 送上天的种子，每批是回来的时刻（对应 time） */
+  launches: number[];
   /** 故事栏，最新的在前 */
   log: string[];
   /** 已玩秒数，不含离线 */
@@ -92,9 +100,11 @@ export function fresh(now = Date.now(), seed = 20240601): GameState {
     made: [],
     dem: BUYERS.map(() => 0),
     seen: ['tab:farm', 'res:fruit', 'act:pick'],
-    f: { cap: false, sold: false, cooked: false, jamFull: false, mood: false, market: false, family: false, tourism: false, winter: false, hungry: false, end: false },
+    f: { cap: false, sold: false, cooked: false, jamFull: false, mood: false, market: false, family: false, tourism: false, smart: false, space: false, winter: false, hungry: false, end: false },
     cal: { on: false, t: 0, weather: 0, rng: seed },
     timer: { arrive: 0, leave: 0 },
+    time: 0,
+    launches: [],
     log: [T.start],
     played: 0,
     last: now

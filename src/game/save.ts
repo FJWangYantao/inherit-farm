@@ -72,6 +72,7 @@ export function normalize(d: Record<string, unknown>): GameState {
     shelves: numbers(base.shelves, d.shelves),
     timer: numbers(base.timer, d.timer),
     workers: num(d.workers),
+    time: num(d.time),
     level: num(d.level),
     played: num(d.played),
     last: num(d.last, base.last)
@@ -81,6 +82,7 @@ export function normalize(d: Record<string, unknown>): GameState {
   const cal = isObject(d.cal) ? d.cal : {};
   out.cal = { on: cal.on === true, t: num(cal.t), weather: Number.isInteger(cal.weather) ? cal.weather as number : 0, rng: num(cal.rng, base.cal.rng) };
   out.techs = Array.isArray(d.techs) ? d.techs.filter((t): t is string => typeof t === 'string' && TECH.has(t)) : [];
+  out.launches = Array.isArray(d.launches) ? d.launches.map(x => num(x)).slice(0, 10) : [];
   out.made = Array.isArray(d.made) ? d.made.filter((t): t is string => typeof t === 'string' && CRAFT.has(t)) : [];
   // 版本 2 早期的存档没有 made，熬过果酱的补上
   if (out.f.cooked && !out.made.includes('jam')) out.made.push('jam');

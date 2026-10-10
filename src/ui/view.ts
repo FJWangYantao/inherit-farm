@@ -232,7 +232,7 @@ export class View {
     const g = this.game, cal = $('cal');
     if (!g.s.cal.on) { setHTML(cal, ''); return; }
     const w = g.weatherName();
-    setHTML(cal, `第 ${g.year()} 年 · <b>${SEASONS[g.season()]}</b>` + (w ? ` · <span class="${g.weatherMult() < 1 ? 'bad' : ''}">${w}</span>` : ''));
+    setHTML(cal, `${g.year()}年 · <b>${SEASONS[g.season()]}</b>` + (w ? ` · <span class="${g.weatherMult() < 1 ? 'bad' : ''}">${w}</span>` : ''));
   }
 
   private renderLog(): void {

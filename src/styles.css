@@ -13,7 +13,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#356F45; --on-leaf:#F8FAF3; --pine:#234E39;
   --r-fruit:#C03F3A; --r-wood:#8A693D; --r-money:#9A7714; --r-jam:#8C3561;
   --r-science:#3A6A9E; --r-clay:#A65A35; --r-plank:#B08A4E; --r-brick:#9C4A35;
-  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742; --r-fertilizer:#5E7A3A; --r-seedling:#3E8E5A; --r-guest:#2F7F8C;
+  --r-dried:#B8742A; --r-juice:#D98B1F; --r-wine:#6E2742; --r-fertilizer:#5E7A3A; --r-seedling:#3E8E5A; --r-guest:#2F7F8C; --r-data:#4A5FA8; --r-spaceSeed:#7A4FA0;
   --peach:#E58C8A; --citrus:#E59A2F; --glass:#7FB3C2;
   --display:"ZCOOL XiaoWei","Songti SC","STSong","Noto Serif SC","SimSun",serif;
   --body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
@@ -25,7 +25,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
     --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
     --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
     --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1; --r-data:#97A8E6; --r-spaceSeed:#C29BE0;
     --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
     color-scheme:dark;
   }
@@ -35,7 +35,7 @@ body{margin:0;-webkit-tap-highlight-color:transparent}
   --leaf:#6DB57F; --on-leaf:#0F1611; --pine:#3F8A63;
   --r-fruit:#EE7B72; --r-wood:#C8A26A; --r-money:#DDBB52; --r-jam:#D98AB0;
   --r-science:#86AEDB; --r-clay:#DB9068; --r-plank:#D8B57E; --r-brick:#D9806A;
-    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1;
+    --r-dried:#E0A65E; --r-juice:#F2B04A; --r-wine:#D97A9E; --r-fertilizer:#A3C278; --r-seedling:#7CCB95; --r-guest:#7CC6D1; --r-data:#97A8E6; --r-spaceSeed:#C29BE0;
   --peach:#F2A5A3; --citrus:#F0B45C; --glass:#9CCAD8;
   color-scheme:dark;
 }
@@ -48,9 +48,11 @@ body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size
 
 /* ---- 标题和日历 ---- */
 .head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;min-width:0}
-.head h1{font-family:var(--display);font-weight:400;font-size:1.3rem;line-height:1.3;letter-spacing:.04em;margin:0;white-space:nowrap}
-.cal{margin:0;height:1.4em;font-size:.8rem;letter-spacing:.08em;color:var(--dim);white-space:nowrap;font-family:var(--display)}
+.head h1{font-family:var(--display);font-weight:400;font-size:1.2rem;line-height:1.3;letter-spacing:.02em;margin:0;white-space:nowrap;flex:none}
+.cal{margin:0;height:1.4em;font-size:.8rem;letter-spacing:.04em;color:var(--dim);white-space:nowrap;font-family:var(--display);
+  min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right}
 .cal b{font-weight:400;color:var(--ink)}
+@media (max-width:380px){.head h1{font-size:1.05rem;letter-spacing:0}}
 .cal .bad{color:var(--short)}
 
 /* ---- 故事：最新的在上面，旧的变淡 ---- */
